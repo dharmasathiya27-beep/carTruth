@@ -4,6 +4,7 @@ API Routes for CarTruth vehicle service.
 
 from fastapi import APIRouter, HTTPException
 from app.models.schemas import SearchQuery, VehicleReport
+from app.services.dvla_service import is_valid_registration_format
 from app.services.vehicle_service import generate_vehicle_report
 
 router = APIRouter()
@@ -16,15 +17,18 @@ async def search_vehicle(query: SearchQuery):
     Returns a complete vehicle report with MOT history, mileage trends, and ownership score.
     """
     
-    if not query.registration or len(query.registration.strip()) < 2:
-        raise HTTPException(status_code=400, detail="Invalid registration number")
+    if not query.registration or not is_valid_registration_format(query.registration):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid registration number. Enter 2-8 letters and numbers.",
+        )
     
-    report = generate_vehicle_report(query.registration)
+    report = await generate_vehicle_report(query.registration)
     
     if not report:
         raise HTTPException(
             status_code=404, 
-            detail=f"Vehicle with registration '{query.registration}' not found. Try: AB20OXY, YM70EUH, GX15EWS, or MK22XYZ"
+            detail=f"Vehicle with registration '{query.registration}' was not found. Check the registration and try again."
         )
     
     return report

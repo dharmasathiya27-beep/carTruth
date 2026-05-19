@@ -40,6 +40,14 @@ export interface OwnershipScore {
   potential_problems: string;
   expected_yearly_cost: string;
   should_buy_recommendation: string;
+  verdict: 'BUY' | 'INSPECT' | 'AVOID';
+  maintenance_risk: 'Low' | 'Medium' | 'High';
+  yearly_cost_estimate: number;
+  risk_badges: string[];
+  repeated_tyres: boolean;
+  repeated_brakes: boolean;
+  mileage_inconsistency: boolean;
+  analysis_notes: string[];
 }
 
 export interface VehicleReport {
@@ -49,6 +57,8 @@ export interface VehicleReport {
   mot_history: MOTRecord[];
   mileage_history: MileageRecord[];
   ownership_score: OwnershipScore;
+  data_source: string;
+  warnings: string[];
 }
 
 export const searchVehicle = async (registration: string): Promise<VehicleReport> => {

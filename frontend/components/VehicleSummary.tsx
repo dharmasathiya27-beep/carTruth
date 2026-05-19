@@ -1,6 +1,6 @@
 'use client';
 
-import { Fuel, Gauge, DollarSign, Zap, CalendarDays, AlertCircle } from 'lucide-react';
+import { Fuel, Gauge, PoundSterling, Zap, CalendarDays, AlertCircle, ShieldCheck } from 'lucide-react';
 import { VehicleDetails, OwnershipScore } from '@/lib/api';
 
 interface VehicleSummaryProps {
@@ -86,6 +86,40 @@ export default function VehicleSummary({
         )}
       </div>
 
+      <div className="grid md:grid-cols-3 gap-4">
+        <div className="glass rounded-2xl p-6">
+          <div className="flex items-center gap-2 mb-3">
+            <ShieldCheck className="w-5 h-5 text-emerald-400" />
+            <h3 className="text-lg font-semibold">Verdict</h3>
+          </div>
+          <span className={`inline-flex px-3 py-1 rounded-lg border text-sm font-semibold ${
+            score.verdict === 'BUY'
+              ? 'bg-green-500/15 text-green-300 border-green-500/30'
+              : score.verdict === 'INSPECT'
+                ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
+                : 'bg-red-500/15 text-red-300 border-red-500/30'
+          }`}>
+            {score.verdict}
+          </span>
+        </div>
+
+        <div className="glass rounded-2xl p-6">
+          <div className="flex items-center gap-2 mb-3">
+            <Gauge className="w-5 h-5 text-cyan-400" />
+            <h3 className="text-lg font-semibold">Maintenance risk</h3>
+          </div>
+          <p className="text-2xl font-bold text-white">{score.maintenance_risk}</p>
+        </div>
+
+        <div className="glass rounded-2xl p-6">
+          <div className="flex items-center gap-2 mb-3">
+            <PoundSterling className="w-5 h-5 text-blue-400" />
+            <h3 className="text-lg font-semibold">Yearly estimate</h3>
+          </div>
+          <p className="text-2xl font-bold text-white">£{score.yearly_cost_estimate.toLocaleString()}</p>
+        </div>
+      </div>
+
       {/* Ownership insights */}
       <div className="grid md:grid-cols-2 gap-6">
         {/* What looks good */}
@@ -113,7 +147,7 @@ export default function VehicleSummary({
         {/* Running cost */}
         <div className="glass rounded-2xl p-6">
           <div className="flex items-center gap-2 mb-4">
-            <DollarSign className="w-5 h-5 text-blue-400" />
+            <PoundSterling className="w-5 h-5 text-blue-400" />
             <h3 className="text-lg font-semibold">Expected yearly cost</h3>
           </div>
           <p className="text-slate-300 leading-relaxed text-sm">

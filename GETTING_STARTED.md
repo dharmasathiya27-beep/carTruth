@@ -48,7 +48,19 @@ Then follow the instructions at the end of the script.
    pip install -r requirements.txt
    ```
 
-5. **Start the backend server:**
+5. **Create backend environment file:**
+   ```bash
+   cp ../.env.example .env
+   ```
+
+   For local MVP development, keep:
+   ```bash
+   USE_MOCK_DATA=true
+   DVLA_API_KEY=
+   DVSA_API_KEY=
+   ```
+
+6. **Start the backend server:**
    ```bash
    python run.py
    ```
@@ -57,6 +69,11 @@ Then follow the instructions at the end of the script.
    ```
    INFO:     Uvicorn running on http://0.0.0.0:8000
    INFO:     Application startup complete
+   ```
+
+   To enable auto-reload during backend development:
+   ```bash
+   RELOAD=true python run.py
    ```
 
 #### Frontend Setup
