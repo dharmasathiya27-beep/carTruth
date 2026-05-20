@@ -38,6 +38,7 @@ def _optional_int(value: object) -> Optional[int]:
 def _normalise_vehicle_payload(registration: str, payload: dict) -> dict:
     engine_capacity = _optional_int(payload.get("engineCapacity"))
     year = _optional_int(payload.get("yearOfManufacture"))
+    co2_emissions = _optional_int(payload.get("co2Emissions"))
 
     return {
         "make": payload.get("make", "Unknown"),
@@ -48,9 +49,16 @@ def _normalise_vehicle_payload(registration: str, payload: dict) -> dict:
         "colour": payload.get("colour", "Unknown"),
         "fuel_type": payload.get("fuelType", "Unknown"),
         "engine_size": round(engine_capacity / 1000, 1) if engine_capacity else None,
+        "engine_capacity_cc": engine_capacity,
         "registration": payload.get("registrationNumber") or normalise_registration(registration),
         "tax_status": payload.get("taxStatus", "Unknown"),
         "tax_due_date": _optional_date(payload.get("taxDueDate")),
+        "mot_status": payload.get("motStatus"),
+        "mot_expiry_date": _optional_date(payload.get("motExpiryDate")),
+        "co2_emissions": co2_emissions,
+        "month_of_first_registration": payload.get("monthOfFirstRegistration"),
+        "wheelplan": payload.get("wheelplan"),
+        "euro_status": payload.get("euroStatus") or payload.get("euroStatusDirective"),
     }
 
 
