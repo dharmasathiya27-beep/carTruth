@@ -127,7 +127,7 @@ export default function Home() {
 
         {/* Footer */}
         <footer className="px-4 py-8 border-t border-white/10 text-center text-slate-500 text-sm">
-          <p>CarTruth MVP • Built with Next.js & FastAPI • Data from DVLA/DVSA (mock in MVP)</p>
+          <p>CarTruth MVP • Built with Next.js & FastAPI • DVLA vehicle data with mock MOT history</p>
         </footer>
       </main>
     </>

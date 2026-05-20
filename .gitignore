@@ -6,22 +6,25 @@ backend/venv/
 backend/app/**/__pycache__/
 backend/__pycache__/
 backend/*.pyc
-backend/.env
 backend/.DS_Store
 backend/dist/
 backend/build/
 backend/*.egg-info/
 
-#env files
-*.env
+# Environment
+.env
+.env.*
+backend/.env
+backend/.env.*
+frontend/.env.local
+frontend/.env.*.local
+!.env.example
 
 # Frontend
 frontend/node_modules/
 frontend/.next/
 frontend/out/
 frontend/dist/
-frontend/.env.local
-frontend/.env.*.local
 frontend/npm-debug.log*
 frontend/yarn-debug.log*
 frontend/yarn-error.log*
@@ -34,8 +37,3 @@ frontend/.DS_Store
 *.swo
 *~
 .DS_Store
-
-# Environment
-.env
-.env.local
-.env.*.local

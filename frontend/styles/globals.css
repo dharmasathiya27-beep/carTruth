@@ -37,3 +37,52 @@ button, a {
 .glass {
   @apply bg-white/10 backdrop-blur-md border border-white/10;
 }
+
+@media print {
+  @page {
+    margin: 16mm;
+  }
+
+  * {
+    color: #111827 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  body {
+    background: #ffffff !important;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .print-summary {
+    display: block !important;
+    color: #111827 !important;
+  }
+
+  .print-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+  }
+
+  .print-grid > div,
+  .glass {
+    border: 1px solid #d1d5db !important;
+    border-radius: 8px !important;
+    padding: 16px !important;
+    break-inside: avoid;
+  }
+
+  main {
+    padding: 0 !important;
+  }
+
+  button,
+  a {
+    display: none !important;
+  }
+}

@@ -55,10 +55,21 @@ Then follow the instructions at the end of the script.
 
    For local MVP development, keep:
    ```bash
+   APP_ENV=development
    USE_MOCK_DATA=true
+   ALLOW_MOCK_MOT_FALLBACK=true
    DVLA_API_KEY=
+   DVSA_CLIENT_ID=
+   DVSA_CLIENT_SECRET=
    DVSA_API_KEY=
+   DVSA_SCOPE_URL=
+   DVSA_TOKEN_URL=
    ```
+
+   To test official DVLA/DVSA data, set `USE_MOCK_DATA=false` and add the
+   credentials supplied by DVLA and DVSA. In local development,
+   `ALLOW_MOCK_MOT_FALLBACK=true` keeps sample MOT history visible if DVSA is
+   unavailable. Keep credentials only in `backend/.env`.
 
 6. **Start the backend server:**
    ```bash
