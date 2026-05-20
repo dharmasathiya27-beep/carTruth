@@ -94,11 +94,7 @@ def detect_repeated_issues(mot_history: list[NormalizedMOTRecord]) -> list[str]:
         for defect in _all_mot_items(record):
             category_years[classify_advisory(defect)].add(record.testDate.year)
 
-    return sorted(
-        category
-        for category, years in category_years.items()
-        if len(years) >= 2
-    )
+    return sorted(category for category, years in category_years.items() if len(years) >= 2)
 
 
 def _item_severity(record: NormalizedMOTRecord, item: str) -> str:
@@ -111,7 +107,9 @@ def _item_severity(record: NormalizedMOTRecord, item: str) -> str:
     return calculate_issue_severity(item, record.result)
 
 
-def _classified_records(mot_history: list[NormalizedMOTRecord], repeated_categories: list[str]) -> list[list[MOTAdvisory]]:
+def _classified_records(
+    mot_history: list[NormalizedMOTRecord], repeated_categories: list[str]
+) -> list[list[MOTAdvisory]]:
     repeated_set = set(repeated_categories)
     records: list[list[MOTAdvisory]] = []
 
@@ -135,7 +133,9 @@ def enrich_mot_history(
     normalised_history: list[NormalizedMOTRecord],
 ) -> list[MOTRecord]:
     """Attach classified advisory objects to each public MOT record."""
-    classified_records = _classified_records(normalised_history, detect_repeated_issues(normalised_history))
+    classified_records = _classified_records(
+        normalised_history, detect_repeated_issues(normalised_history)
+    )
     return [
         record.model_copy(update={"classified_defects": classified_records[index]})
         for index, record in enumerate(report_history)

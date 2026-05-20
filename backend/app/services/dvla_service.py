@@ -1,21 +1,28 @@
 """Integration point for the DVLA Vehicle Enquiry API."""
 
+import logging
 import re
 from typing import Optional
 
 import aiohttp
-
 from app.config import settings
+from app.services.lookup_cache import get_cached, set_cached
 
-DVLA_TIMEOUT_SECONDS = 8
+logger = logging.getLogger(__name__)
+
+REGISTRATION_ALLOWED_PATTERN = re.compile(r"^[A-Z0-9 ]+$")
 
 
 def normalise_registration(registration: str) -> str:
     """DVLA expects uppercase registration without spaces."""
-    return re.sub(r"[^A-Z0-9]", "", registration.upper())
+    return re.sub(r"\s+", "", registration.upper().strip())
 
 
 def is_valid_registration_format(registration: str) -> bool:
+    value = (registration or "").upper().strip()
+    if not value or not REGISTRATION_ALLOWED_PATTERN.fullmatch(value):
+        return False
+
     cleaned = normalise_registration(registration)
     return 2 <= len(cleaned) <= 8 and cleaned.isalnum()
 
@@ -70,11 +77,22 @@ async def fetch_vehicle_from_dvla(registration: str) -> Optional[dict]:
     """
     registration_clean = normalise_registration(registration)
 
-    if settings.use_mock_data or not settings.dvla_api_key or not is_valid_registration_format(registration):
+    if (
+        settings.use_mock_data
+        or not settings.dvla_api_key
+        or not is_valid_registration_format(registration)
+    ):
         return None
 
+    cache_key = f"dvla:{registration_clean}"
+    cached = get_cached(cache_key)
+    if cached is not None:
+        return cached
+
     try:
-        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=DVLA_TIMEOUT_SECONDS)) as session:
+        async with aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=settings.dvla_timeout_seconds)
+        ) as session:
             async with session.post(
                 settings.dvla_api_base_url,
                 headers={
@@ -84,14 +102,33 @@ async def fetch_vehicle_from_dvla(registration: str) -> Optional[dict]:
                 json={"registrationNumber": registration_clean},
             ) as response:
                 if response.status in {400, 404}:
+                    logger.info(
+                        "DVLA lookup returned no vehicle for registration=%s", registration_clean
+                    )
                     return None
                 if response.status >= 500:
+                    logger.warning(
+                        "DVLA lookup failed with upstream status=%s for registration=%s",
+                        response.status,
+                        registration_clean,
+                    )
                     return None
                 payload = await response.json()
                 if not isinstance(payload, dict) or not payload.get("make"):
+                    logger.warning(
+                        "DVLA lookup returned incomplete payload for registration=%s",
+                        registration_clean,
+                    )
                     return None
-                return _normalise_vehicle_payload(registration_clean, payload)
-    except (aiohttp.ClientError, TimeoutError, ValueError):
+                return set_cached(
+                    cache_key, _normalise_vehicle_payload(registration_clean, payload)
+                )
+    except (aiohttp.ClientError, TimeoutError, ValueError) as exc:
+        logger.warning(
+            "DVLA lookup unavailable for registration=%s error_type=%s",
+            registration_clean,
+            type(exc).__name__,
+        )
         return None
 
 

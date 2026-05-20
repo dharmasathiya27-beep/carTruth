@@ -3,8 +3,8 @@
 from datetime import date
 from typing import Optional
 
-from app.models.schemas import MOTRecord, MileageRecord
 from app.models.mot_schema import NormalizedMOTRecord
+from app.models.schemas import MileageRecord, MOTRecord
 from app.services.mot_data_normalizer import normalise_mock_mot_history
 
 MOCK_VEHICLES = {
@@ -114,7 +114,10 @@ MOCK_MOT_HISTORY = {
             test_date=date(2025, 10, 5),
             result="PASSED",
             mileage=70400,
-            defects=["Nearside front tyre worn close to legal limit", "Rear brake disc slightly corroded"],
+            defects=[
+                "Nearside front tyre worn close to legal limit",
+                "Rear brake disc slightly corroded",
+            ],
         ),
         MOTRecord(
             test_date=date(2024, 10, 5),

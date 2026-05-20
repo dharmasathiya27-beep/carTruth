@@ -25,7 +25,9 @@ const toneClass = {
 
 function categoryCount(motHistory: MOTRecord[] = [], category: string) {
   return motHistory.reduce((count, record) => {
-    return count + (record.classified_defects || []).filter((item) => item.category === category).length;
+    return (
+      count + (record.classified_defects || []).filter((item) => item.category === category).length
+    );
   }, 0);
 }
 
@@ -51,7 +53,10 @@ function buildMaintenanceInsights(
   if (tyreCount >= 2 || avgMileagePerYear > 12000) {
     insights.push({
       label: 'Tyre replacement likely within 6-12 months',
-      detail: tyreCount >= 2 ? 'Tyre wear is a repeated advisory area.' : 'Higher annual mileage can accelerate tyre wear.',
+      detail:
+        tyreCount >= 2
+          ? 'Tyre wear is a repeated advisory area.'
+          : 'Higher annual mileage can accelerate tyre wear.',
       tone: 'amber',
     });
   }
@@ -87,7 +92,9 @@ function buildOwnershipPatternInsights(
   sortedHistory: MileageRecord[],
   avgMileagePerYear: number,
 ): Insight[] {
-  const yearlyChanges = sortedHistory.slice(1).map((record, index) => record.mileage - sortedHistory[index].mileage);
+  const yearlyChanges = sortedHistory
+    .slice(1)
+    .map((record, index) => record.mileage - sortedHistory[index].mileage);
   const maxChange = Math.max(...yearlyChanges, 0);
   const minChange = Math.min(...yearlyChanges, 0);
   const consistent = yearlyChanges.length > 1 && maxChange - minChange < 5000;
@@ -143,20 +150,29 @@ export default function MileageTrend({ history, motHistory = [], vehicleYear }: 
   }
 
   // Sort by date ascending for display
-  const sortedHistory = [...history].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-  
+  const sortedHistory = [...history].sort(
+    (a, b) => new Date(a.date).getTime() - new Date(b.date).getTime(),
+  );
+
   // Calculate stats
   const latestMileage = sortedHistory[sortedHistory.length - 1].mileage;
   const earliestMileage = sortedHistory[0].mileage;
   const totalMileage = latestMileage - earliestMileage;
   const avgMileagePerYear = totalMileage / (sortedHistory.length - 1 || 1);
-  const vehicleAge = vehicleYear ? Math.max(new Date().getFullYear() - vehicleYear, 0) : sortedHistory.length;
-  const maintenanceInsights = buildMaintenanceInsights(latestMileage, avgMileagePerYear, vehicleAge, motHistory);
+  const vehicleAge = vehicleYear
+    ? Math.max(new Date().getFullYear() - vehicleYear, 0)
+    : sortedHistory.length;
+  const maintenanceInsights = buildMaintenanceInsights(
+    latestMileage,
+    avgMileagePerYear,
+    vehicleAge,
+    motHistory,
+  );
   const ownershipInsights = buildOwnershipPatternInsights(sortedHistory, avgMileagePerYear);
 
   // Create a simple bar chart
-  const maxMileage = Math.max(...sortedHistory.map(r => r.mileage));
-  const minMileage = Math.min(...sortedHistory.map(r => r.mileage));
+  const maxMileage = Math.max(...sortedHistory.map((r) => r.mileage));
+  const minMileage = Math.min(...sortedHistory.map((r) => r.mileage));
   const range = maxMileage - minMileage || 1;
 
   return (
@@ -167,17 +183,13 @@ export default function MileageTrend({ history, motHistory = [], vehicleYear }: 
       <div className="grid grid-cols-3 gap-4 mb-8">
         <div className="bg-slate-800/40 rounded-lg p-4">
           <p className="text-xs text-slate-400 mb-1">Latest Mileage</p>
-          <p className="text-2xl font-bold text-blue-400">
-            {latestMileage.toLocaleString()}
-          </p>
+          <p className="text-2xl font-bold text-blue-400">{latestMileage.toLocaleString()}</p>
           <p className="text-xs text-slate-500 mt-1">miles</p>
         </div>
 
         <div className="bg-slate-800/40 rounded-lg p-4">
           <p className="text-xs text-slate-400 mb-1">Total Added</p>
-          <p className="text-2xl font-bold text-purple-400">
-            {totalMileage.toLocaleString()}
-          </p>
+          <p className="text-2xl font-bold text-purple-400">{totalMileage.toLocaleString()}</p>
           <p className="text-xs text-slate-500 mt-1">miles</p>
         </div>
 
@@ -199,7 +211,10 @@ export default function MileageTrend({ history, motHistory = [], vehicleYear }: 
           return (
             <div key={index} className="flex items-end gap-3 group">
               <div className="w-20 text-xs text-slate-400 text-right">
-                {new Date(record.date).toLocaleDateString('en-GB', { month: 'short', year: '2-digit' })}
+                {new Date(record.date).toLocaleDateString('en-GB', {
+                  month: 'short',
+                  year: '2-digit',
+                })}
               </div>
               <div className="flex-1">
                 <div className="relative h-10 bg-slate-800/40 rounded-lg overflow-hidden">
@@ -253,7 +268,10 @@ export default function MileageTrend({ history, motHistory = [], vehicleYear }: 
           </div>
           <div className="grid gap-2">
             {maintenanceInsights.map((insight) => (
-              <div key={insight.label} className={`rounded-lg border px-3 py-2 ${toneClass[insight.tone]}`}>
+              <div
+                key={insight.label}
+                className={`rounded-lg border px-3 py-2 ${toneClass[insight.tone]}`}
+              >
                 <div className="flex items-start gap-2">
                   <Wrench className="w-4 h-4 mt-0.5 flex-shrink-0" />
                   <div>
@@ -273,7 +291,10 @@ export default function MileageTrend({ history, motHistory = [], vehicleYear }: 
           </div>
           <div className="grid gap-2">
             {ownershipInsights.map((insight) => (
-              <div key={insight.label} className={`rounded-lg border px-3 py-2 ${toneClass[insight.tone]}`}>
+              <div
+                key={insight.label}
+                className={`rounded-lg border px-3 py-2 ${toneClass[insight.tone]}`}
+              >
                 <div className="flex items-start gap-2">
                   <Gauge className="w-4 h-4 mt-0.5 flex-shrink-0" />
                   <div>

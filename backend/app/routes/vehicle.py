@@ -2,10 +2,11 @@
 API Routes for CarTruth vehicle service.
 """
 
-from fastapi import APIRouter, HTTPException
+from app.config import settings
 from app.models.schemas import SearchQuery, VehicleReport
-from app.services.dvla_service import is_valid_registration_format
+from app.services.dvla_service import is_valid_registration_format, normalise_registration
 from app.services.vehicle_service import generate_vehicle_report
+from fastapi import APIRouter, HTTPException
 
 router = APIRouter()
 
@@ -16,25 +17,39 @@ async def search_vehicle(query: SearchQuery):
     Search for a vehicle by registration number.
     Returns a complete vehicle report with MOT history, mileage trends, and ownership score.
     """
-    
+
     if not query.registration or not is_valid_registration_format(query.registration):
         raise HTTPException(
             status_code=400,
-            detail="Invalid registration number. Enter 2-8 letters and numbers.",
+            detail="Invalid registration number. Use only letters, numbers, and spaces.",
         )
-    
-    report = await generate_vehicle_report(query.registration)
-    
+
+    registration = normalise_registration(query.registration)
+    report = await generate_vehicle_report(registration)
+
     if not report:
         raise HTTPException(
-            status_code=404, 
-            detail=f"Vehicle with registration '{query.registration}' was not found. Check the registration and try again."
+            status_code=404,
+            detail=(
+                f"Vehicle with registration '{registration}' was not found. "
+                "Check the registration and try again."
+            ),
         )
-    
+
     return report
 
 
 @router.get("/health")
 async def health_check():
     """Health check endpoint."""
-    return {"status": "ok", "service": "cartruth-api"}
+    return {
+        "status": "ok",
+        "service": "cartruth-api",
+        "environment": settings.app_env,
+        "mock_data_enabled": settings.use_mock_data,
+        "mock_mot_fallback_enabled": settings.allow_mock_mot_fallback,
+        "integrations": {
+            "dvla_configured": settings.has_dvla_config,
+            "dvsa_configured": settings.has_dvsa_config,
+        },
+    }

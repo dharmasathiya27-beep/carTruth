@@ -10,19 +10,29 @@ export default function SearchBox() {
   const [error, setError] = useState('');
   const router = useRouter();
 
+  const cleanRegistration = (value: string) => value.toUpperCase().replace(/\s+/g, '');
+  const isValidRegistration = (value: string) => /^[A-Z0-9 ]+$/.test(value.trim());
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (!registration.trim()) {
+    const cleaned = cleanRegistration(registration);
+
+    if (!cleaned) {
       setError('Please enter a registration number');
+      return;
+    }
+
+    if (!isValidRegistration(registration) || cleaned.length < 2 || cleaned.length > 8) {
+      setError('Use only letters and numbers from the registration plate.');
       return;
     }
 
     setLoading(true);
     try {
       // Navigate to report page - the page will handle the API call
-      router.push(`/report/${encodeURIComponent(registration)}`);
+      router.push(`/report/${encodeURIComponent(cleaned)}`);
     } catch (err: any) {
       setError(err.message || 'Failed to search');
       setLoading(false);
@@ -44,7 +54,7 @@ export default function SearchBox() {
               value={registration}
               onChange={(e) => setRegistration(e.target.value.toUpperCase())}
               placeholder="Enter registration (e.g., AB20OXY)"
-              maxLength={7}
+              maxLength={10}
               disabled={loading}
               className="flex-1 bg-transparent text-lg font-semibold text-white placeholder-slate-400 focus:outline-none disabled:opacity-50"
             />

@@ -13,7 +13,9 @@ export default function PrintFriendlyReportSection({ report }: PrintFriendlyRepo
     <section className="print-summary hidden print:block">
       <div className="mb-6">
         <h1 className="text-3xl font-bold">CarTruth Vehicle Report</h1>
-        <p>{vehicle.registration} - {vehicle.make} {vehicle.model}</p>
+        <p>
+          {vehicle.registration} - {vehicle.make} {vehicle.model}
+        </p>
       </div>
 
       <div className="print-grid">
@@ -21,7 +23,14 @@ export default function PrintFriendlyReportSection({ report }: PrintFriendlyRepo
           <h2>Vehicle Summary</h2>
           <p>Year: {vehicle.year || 'N/A'}</p>
           <p>Fuel: {vehicle.fuel_type || 'N/A'}</p>
-          <p>Engine: {vehicle.engine_capacity_cc ? `${vehicle.engine_capacity_cc} cc` : vehicle.engine_size ? `${vehicle.engine_size}L` : 'N/A'}</p>
+          <p>
+            Engine:{' '}
+            {vehicle.engine_capacity_cc
+              ? `${vehicle.engine_capacity_cc} cc`
+              : vehicle.engine_size
+                ? `${vehicle.engine_size}L`
+                : 'N/A'}
+          </p>
           <p>Colour: {vehicle.colour || 'N/A'}</p>
           <p>Tax: {vehicle.tax_status || 'N/A'}</p>
         </div>

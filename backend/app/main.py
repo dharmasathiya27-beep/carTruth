@@ -3,9 +3,10 @@ CarTruth Backend API - FastAPI application entry point.
 Premium AI car intelligence service.
 """
 
+from app.config import settings
+from app.routes import vehicle
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from app.routes import vehicle
 
 app = FastAPI(
     title="CarTruth API",
@@ -16,7 +17,7 @@ app = FastAPI(
 # Enable CORS for frontend communication
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # In production, restrict to frontend domain
+    allow_origins=settings.allowed_cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -26,11 +27,17 @@ app.add_middleware(
 app.include_router(vehicle.router, prefix="/api/vehicle", tags=["vehicle"])
 
 
+@app.get("/health")
+async def health():
+    """Top-level health endpoint for deployment checks."""
+    return await vehicle.health_check()
+
+
 @app.get("/")
 async def root():
     """Root endpoint."""
     return {
         "message": "Welcome to CarTruth API",
         "docs": "/docs",
-        "health": "/api/vehicle/health",
+        "health": "/health",
     }

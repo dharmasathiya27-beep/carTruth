@@ -1,9 +1,12 @@
-from pydantic import BaseModel, Field
-from typing import Optional, List
 from datetime import date
+from typing import List, Optional
+
+from pydantic import BaseModel, Field
+
 
 class MOTRecord(BaseModel):
     """MOT test result"""
+
     test_date: date
     testDate: Optional[date] = None
     expiryDate: Optional[date] = None
@@ -17,15 +20,19 @@ class MOTRecord(BaseModel):
     minorDefects: List[str] = Field(default_factory=list)
     classified_defects: List["MOTAdvisory"] = Field(default_factory=list)
 
+
 class MOTAdvisory(BaseModel):
     """Classified MOT advisory or failure item"""
+
     text: str
     category: str
     severity: str
     is_repeated: bool = False
 
+
 class MOTIntelligence(BaseModel):
     """Aggregated MOT risk intelligence"""
+
     repeated_issues: List[str] = Field(default_factory=list)
     highest_risk_category: str = "None"
     highest_severity: str = "Low"
@@ -35,13 +42,17 @@ class MOTIntelligence(BaseModel):
     severity_counts: dict[str, int] = Field(default_factory=dict)
     summary: str = "No MOT intelligence available"
 
+
 class MileageRecord(BaseModel):
     """Mileage reading at a specific date"""
+
     date: date
     mileage: int
 
+
 class VehicleDetails(BaseModel):
     """Core vehicle information"""
+
     make: str
     model: str
     year: int
@@ -59,8 +70,10 @@ class VehicleDetails(BaseModel):
     wheelplan: Optional[str] = None
     euro_status: Optional[str] = None
 
+
 class OwnershipScore(BaseModel):
     """AI-generated ownership assessment"""
+
     score: int  # 0-100
     ownership_score: int = 0
     summary: str
@@ -85,8 +98,10 @@ class OwnershipScore(BaseModel):
     mileage_inconsistency: bool = False
     analysis_notes: List[str] = Field(default_factory=list)
 
+
 class VehicleReport(BaseModel):
     """Complete vehicle report response"""
+
     vehicle: VehicleDetails
     current_mot_status: str  # "Valid", "Expired", "Due Soon"
     mot_valid_until: Optional[date] = None
@@ -100,6 +115,8 @@ class VehicleReport(BaseModel):
     unavailable_data: List[str] = Field(default_factory=list)
     warnings: List[str] = Field(default_factory=list)
 
+
 class SearchQuery(BaseModel):
     """Search request"""
+
     registration: str

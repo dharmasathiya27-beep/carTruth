@@ -1,6 +1,9 @@
 import axios from 'axios';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_URL =
+  process.env.NEXT_PUBLIC_API_BASE_URL ||
+  process.env.NEXT_PUBLIC_API_URL ||
+  'http://localhost:8000';
 
 const apiClient = axios.create({
   baseURL: API_URL,
@@ -8,6 +11,8 @@ const apiClient = axios.create({
     'Content-Type': 'application/json',
   },
 });
+
+const cleanRegistration = (registration: string) => registration.toUpperCase().replace(/\s+/g, '');
 
 export interface VehicleDetails {
   make: string;
@@ -35,6 +40,10 @@ export interface MOTAdvisory {
   is_repeated: boolean;
 }
 
+export type CountMap = {
+  [key: string]: number;
+};
+
 export interface MOTRecord {
   test_date: string;
   testDate?: string;
@@ -56,8 +65,8 @@ export interface MOTIntelligence {
   highest_severity: 'Low' | 'Medium' | 'High' | 'Critical';
   maintenance_warnings: string[];
   future_concerns: string[];
-  category_counts: Record<string, number>;
-  severity_counts: Record<string, number>;
+  category_counts: CountMap;
+  severity_counts: CountMap;
   summary: string;
 }
 
@@ -110,23 +119,38 @@ export interface VehicleReport {
 export const searchVehicle = async (registration: string): Promise<VehicleReport> => {
   try {
     const response = await apiClient.post<VehicleReport>('/api/vehicle/search', {
-      registration,
+      registration: cleanRegistration(registration),
     });
     return response.data;
   } catch (error: any) {
+    if (!error.response) {
+      throw new Error(
+        'CarTruth backend is not reachable. Start the FastAPI server on port 8000 and try again.',
+      );
+    }
     if (error.response?.status === 400) {
       throw new Error(error.response.data.detail || 'Invalid registration number');
     }
     if (error.response?.status === 404) {
-      throw new Error(error.response.data.detail || 'Vehicle not found');
+      throw new Error(
+        error.response.data.detail ||
+          'We could not find that vehicle. Check the registration and try again.',
+      );
     }
-    throw new Error(error.message || 'Failed to search vehicle');
+    if (error.response?.status >= 500) {
+      throw new Error(
+        'Official vehicle data is temporarily unavailable. Please try again shortly.',
+      );
+    }
+    throw new Error(
+      'Unable to load the vehicle report right now. Please check your connection and try again.',
+    );
   }
 };
 
 export const healthCheck = async (): Promise<boolean> => {
   try {
-    await apiClient.get('/api/vehicle/health');
+    await apiClient.get('/health');
     return true;
   } catch {
     return false;

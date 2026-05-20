@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 520" role="img" aria-label="Sedan silhouette">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#0f172a"/>
+      <stop offset="0.55" stop-color="#111827"/>
+      <stop offset="1" stop-color="#164e63"/>
+    </linearGradient>
+    <linearGradient id="car" x1="0" x2="1">
+      <stop offset="0" stop-color="#334155"/>
+      <stop offset="1" stop-color="#0f172a"/>
+    </linearGradient>
+  </defs>
+  <rect width="900" height="520" fill="url(#bg)"/>
+  <circle cx="690" cy="120" r="190" fill="#22d3ee" opacity="0.12"/>
+  <path d="M185 330c20-70 88-112 180-118h144c75 0 142 42 186 102l58 14c42 10 69 45 68 88H79c1-43 30-77 72-88l34 2Z" fill="url(#car)" stroke="#67e8f9" stroke-opacity="0.35" stroke-width="5"/>
+  <path d="M331 231c-46 9-86 38-113 82h424c-37-48-84-82-147-82H331Z" fill="#0f172a" opacity="0.92"/>
+  <path d="M344 247h108v60H262c22-31 50-51 82-60Zm131 0h25c43 0 79 20 110 60H475v-60Z" fill="#94a3b8" opacity="0.16"/>
+  <circle cx="227" cy="414" r="55" fill="#020617" stroke="#64748b" stroke-width="13"/>
+  <circle cx="227" cy="414" r="22" fill="#334155"/>
+  <circle cx="675" cy="414" r="55" fill="#020617" stroke="#64748b" stroke-width="13"/>
+  <circle cx="675" cy="414" r="22" fill="#334155"/>
+  <path d="M143 353h620" stroke="#e2e8f0" stroke-opacity="0.12" stroke-width="4"/>
+</svg>

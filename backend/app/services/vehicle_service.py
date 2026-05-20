@@ -1,5 +1,6 @@
 """Vehicle report orchestration service."""
 
+import logging
 from typing import Optional
 
 from app.config import settings
@@ -11,6 +12,8 @@ from app.services.vehicle_analysis_service import (
     calculate_ownership_score,
     get_current_mot_status,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def _build_trust_metadata(
@@ -123,9 +126,14 @@ async def generate_vehicle_report(registration: str) -> Optional[VehicleReport]:
         data_source = "mock"
         vehicle_data = mock_vehicle_service.get_vehicle_by_registration(registration_clean)
         if not settings.use_mock_data:
+            logger.info(
+                "Using mock vehicle fallback after DVLA lookup returned no usable data for registration=%s",
+                registration_clean,
+            )
             warnings.append("DVLA lookup unavailable, using mock vehicle data where possible.")
 
     if not vehicle_data:
+        logger.info("Vehicle report could not be generated for registration=%s", registration_clean)
         return None
 
     dvsa_mot_data = await dvsa_service.fetch_vehicle_mot_data_from_dvsa(registration_clean)
@@ -133,17 +141,27 @@ async def generate_vehicle_report(registration: str) -> Optional[VehicleReport]:
     vehicle_data = _enrich_vehicle_data_from_dvsa(vehicle_data, dvsa_mot_data["vehicle_identity"])
 
     if not normalised_mot_history and not settings.use_mock_data:
-        warnings.append("DVSA MOT data unavailable. MOT history and mileage insights may be limited.")
+        warnings.append(
+            "DVSA MOT data unavailable. MOT history and mileage insights may be limited."
+        )
         if settings.allow_mock_mot_fallback:
-            normalised_mot_history = mock_vehicle_service.get_normalized_mot_history(registration_clean)
+            normalised_mot_history = mock_vehicle_service.get_normalized_mot_history(
+                registration_clean
+            )
             if normalised_mot_history:
+                logger.info(
+                    "Using development mock MOT fallback for registration=%s",
+                    registration_clean,
+                )
                 warnings.append("Using development mock MOT history fallback.")
 
     mot_history = [normalised_to_mot_record(record) for record in normalised_mot_history]
     mileage_history = _build_mileage_history_from_mot(normalised_mot_history)
 
     mot_history = sorted(mot_history, key=lambda record: record.test_date, reverse=True)
-    normalised_mot_history = sorted(normalised_mot_history, key=lambda record: record.testDate, reverse=True)
+    normalised_mot_history = sorted(
+        normalised_mot_history, key=lambda record: record.testDate, reverse=True
+    )
     mileage_history = sorted(mileage_history, key=lambda record: record.date, reverse=True)
     mot_history = enrich_mot_history(mot_history, normalised_mot_history)
     mot_intelligence = summarise_mot_risks(normalised_mot_history)

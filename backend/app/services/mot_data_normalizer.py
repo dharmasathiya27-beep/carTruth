@@ -43,7 +43,11 @@ def normalised_to_mot_record(record: NormalizedMOTRecord) -> MOTRecord:
         *record.majorDefects,
         *record.minorDefects,
     ]
-    result = "PASSED" if record.result == "PASS" else "FAILED" if record.result == "FAIL" else record.result
+    result = (
+        "PASSED"
+        if record.result == "PASS"
+        else "FAILED" if record.result == "FAIL" else record.result
+    )
 
     return MOTRecord(
         test_date=record.testDate,
@@ -66,7 +70,9 @@ def mot_record_to_normalised(record: MOTRecord) -> NormalizedMOTRecord:
     failures = record.failures
     advisories = record.advisories
 
-    if not any([advisories, failures, record.dangerousDefects, record.majorDefects, record.minorDefects]):
+    if not any(
+        [advisories, failures, record.dangerousDefects, record.majorDefects, record.minorDefects]
+    ):
         if result == "FAIL":
             failures = record.defects
         else:
@@ -74,7 +80,8 @@ def mot_record_to_normalised(record: MOTRecord) -> NormalizedMOTRecord:
 
     return NormalizedMOTRecord(
         testDate=record.testDate or record.test_date,
-        expiryDate=record.expiryDate or (record.test_date + timedelta(days=365) if result == "PASS" else None),
+        expiryDate=record.expiryDate
+        or (record.test_date + timedelta(days=365) if result == "PASS" else None),
         result=result,
         mileage=record.mileage,
         advisories=advisories,
@@ -109,7 +116,9 @@ def normalise_dvsa_mot_response(response: Any) -> list[NormalizedMOTRecord]:
                 tests.extend(vehicle_tests)
 
     if not tests and isinstance(response, dict):
-        maybe_tests = response.get("motTests") or response.get("mot_tests") or response.get("motTestHistory")
+        maybe_tests = (
+            response.get("motTests") or response.get("mot_tests") or response.get("motTestHistory")
+        )
         if isinstance(maybe_tests, list):
             tests.extend(maybe_tests)
 
@@ -129,10 +138,7 @@ def normalise_dvsa_mot_response(response: Any) -> list[NormalizedMOTRecord]:
             if not isinstance(defect, dict):
                 continue
             text = str(
-                defect.get("text")
-                or defect.get("description")
-                or defect.get("comment")
-                or ""
+                defect.get("text") or defect.get("description") or defect.get("comment") or ""
             ).strip()
             if not text:
                 continue

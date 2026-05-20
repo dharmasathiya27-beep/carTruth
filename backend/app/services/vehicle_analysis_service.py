@@ -8,7 +8,7 @@ signals that the frontend can explain to users.
 from datetime import date, timedelta
 from typing import Optional
 
-from app.models.schemas import MOTRecord, MileageRecord, OwnershipScore, VehicleDetails
+from app.models.schemas import MileageRecord, MOTRecord, OwnershipScore, VehicleDetails
 
 AVERAGE_ANNUAL_MILES = 12000
 
@@ -201,7 +201,9 @@ def estimate_environmental_impact(vehicle: VehicleDetails) -> str:
     return "Average"
 
 
-def _score_from_ratings(vehicle: VehicleDetails, risk_level: str, reliability: str, environmental: str) -> int:
+def _score_from_ratings(
+    vehicle: VehicleDetails, risk_level: str, reliability: str, environmental: str
+) -> int:
     score = 82
     age = calculate_vehicle_age(vehicle)
     fuel = _fuel_type(vehicle)
@@ -244,24 +246,36 @@ def generate_ai_summary(
     sentences = [_rating_summary(score)]
 
     if fuel == "diesel" and age >= 7:
-        sentences.append("Older diesel vehicles may carry increased maintenance and emissions-related risks.")
+        sentences.append(
+            "Older diesel vehicles may carry increased maintenance and emissions-related risks."
+        )
     elif fuel in {"electric", "hybrid"}:
         sentences.append("The vehicle shows lower running cost characteristics for its class.")
 
     if risk_level == "Low":
-        sentences.append("The available DVLA and history signals point to a lower-risk ownership profile.")
+        sentences.append(
+            "The available DVLA and history signals point to a lower-risk ownership profile."
+        )
     elif risk_level == "High":
-        sentences.append("Several factors increase the chance of higher maintenance or compliance costs.")
+        sentences.append(
+            "Several factors increase the chance of higher maintenance or compliance costs."
+        )
 
     if reliability == "Strong":
         sentences.append("Reliability indicators are positive for regular use.")
     elif reliability == "Caution":
-        sentences.append("Reliability should be confirmed with service history and a mechanical inspection.")
+        sentences.append(
+            "Reliability should be confirmed with service history and a mechanical inspection."
+        )
 
     if environmental in {"Excellent", "Good"}:
-        sentences.append("Environmental indicators are favourable compared with higher-emission vehicles.")
+        sentences.append(
+            "Environmental indicators are favourable compared with higher-emission vehicles."
+        )
     elif environmental == "Poor":
-        sentences.append("Higher emissions may increase tax exposure and urban driving restrictions over time.")
+        sentences.append(
+            "Higher emissions may increase tax exposure and urban driving restrictions over time."
+        )
 
     sentences.append(f"Estimated yearly running cost is around £{yearly_cost:,}.")
     return " ".join(sentences)
@@ -367,8 +381,12 @@ def calculate_ownership_score(
         "AVOID": "Avoid unless priced very aggressively. The available data points to elevated ownership risk.",
     }[verdict]
 
-    ai_summary = generate_ai_summary(vehicle, score, risk_level, reliability, environmental, yearly_cost)
-    factors = _build_factor_list(vehicle, mot_history, mileage_history, risk_level, reliability, environmental)
+    ai_summary = generate_ai_summary(
+        vehicle, score, risk_level, reliability, environmental, yearly_cost
+    )
+    factors = _build_factor_list(
+        vehicle, mot_history, mileage_history, risk_level, reliability, environmental
+    )
 
     return OwnershipScore(
         score=score,

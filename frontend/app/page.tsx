@@ -29,7 +29,8 @@ export default function Home() {
                 </span>
               </h1>
               <p className="text-xl text-slate-300 max-w-2xl mx-auto mb-8">
-                Enter a UK registration number and get an AI-powered report revealing the vehicle's history, condition, and ownership score in seconds.
+                Enter a UK registration number and get an AI-powered report revealing the
+                vehicle&apos;s history, condition, and ownership score in seconds.
               </p>
             </div>
 
@@ -127,7 +128,9 @@ export default function Home() {
 
         {/* Footer */}
         <footer className="px-4 py-8 border-t border-white/10 text-center text-slate-500 text-sm">
-          <p>CarTruth MVP • Built with Next.js & FastAPI • DVLA vehicle data with mock MOT history</p>
+          <p>
+            CarTruth MVP • Built with Next.js & FastAPI • DVLA vehicle data with mock MOT history
+          </p>
         </footer>
       </main>
     </>

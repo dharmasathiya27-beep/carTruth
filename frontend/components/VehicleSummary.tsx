@@ -9,11 +9,7 @@ interface VehicleSummaryProps {
   motValidUntil?: string;
 }
 
-export default function VehicleSummary({
-  vehicle,
-  motStatus,
-  motValidUntil,
-}: VehicleSummaryProps) {
+export default function VehicleSummary({ vehicle, motStatus, motValidUntil }: VehicleSummaryProps) {
   const getMotStatusColor = () => {
     if (motStatus === 'Valid') return 'bg-green-500/20 text-green-300 border-green-500/30';
     if (motStatus === 'Due Soon') return 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30';
@@ -34,11 +30,15 @@ export default function VehicleSummary({
         <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
           <div>
             <h2 className="text-2xl font-semibold text-white mb-1">Vehicle Details</h2>
-            <p className="text-sm text-slate-400">Registration, tax, emissions, and manufacturing data.</p>
+            <p className="text-sm text-slate-400">
+              Registration, tax, emissions, and manufacturing data.
+            </p>
           </div>
           <div className="text-right">
             <div className="text-2xl font-bold text-blue-400">{vehicle.year || 'N/A'}</div>
-            <p className="text-sm text-slate-400">{vehicleAge !== null ? `${vehicleAge} years old` : 'Age unavailable'}</p>
+            <p className="text-sm text-slate-400">
+              {vehicleAge !== null ? `${vehicleAge} years old` : 'Age unavailable'}
+            </p>
           </div>
         </div>
 
@@ -56,7 +56,11 @@ export default function VehicleSummary({
             <p className="text-xs text-slate-400 mb-1">Engine</p>
             <p className="text-lg font-semibold flex items-center gap-2">
               <Zap className="w-4 h-4 text-blue-400" />
-              {vehicle.engine_capacity_cc ? `${vehicle.engine_capacity_cc} cc` : vehicle.engine_size ? `${vehicle.engine_size}L` : 'N/A'}
+              {vehicle.engine_capacity_cc
+                ? `${vehicle.engine_capacity_cc} cc`
+                : vehicle.engine_size
+                  ? `${vehicle.engine_size}L`
+                  : 'N/A'}
             </p>
           </div>
 
@@ -75,7 +79,9 @@ export default function VehicleSummary({
           <div className="bg-slate-800/40 rounded-lg p-4">
             <p className="text-xs text-slate-400 mb-1">Tax Due</p>
             <p className="text-lg font-semibold">
-              {vehicle.tax_due_date ? new Date(vehicle.tax_due_date).toLocaleDateString('en-GB') : 'N/A'}
+              {vehicle.tax_due_date
+                ? new Date(vehicle.tax_due_date).toLocaleDateString('en-GB')
+                : 'N/A'}
             </p>
           </div>
 
@@ -83,19 +89,24 @@ export default function VehicleSummary({
             <p className="text-xs text-slate-400 mb-1">CO2</p>
             <p className="text-lg font-semibold flex items-center gap-2">
               <Cloud className="w-4 h-4 text-blue-400" />
-              {vehicle.co2_emissions !== undefined && vehicle.co2_emissions !== null ? `${vehicle.co2_emissions} g/km` : 'N/A'}
+              {vehicle.co2_emissions !== undefined && vehicle.co2_emissions !== null
+                ? `${vehicle.co2_emissions} g/km`
+                : 'N/A'}
             </p>
           </div>
 
           <div className="bg-slate-800/40 rounded-lg p-4">
             <p className="text-xs text-slate-400 mb-1">First Registered</p>
-            <p className="text-lg font-semibold">{formatMonth(vehicle.month_of_first_registration)}</p>
+            <p className="text-lg font-semibold">
+              {formatMonth(vehicle.month_of_first_registration)}
+            </p>
           </div>
 
           <div className="bg-slate-800/40 rounded-lg p-4">
             <p className="text-xs text-slate-400 mb-1">Wheelplan / Euro</p>
             <p className="text-lg font-semibold">
-              {vehicle.wheelplan || 'N/A'}{vehicle.euro_status ? `, ${vehicle.euro_status}` : ''}
+              {vehicle.wheelplan || 'N/A'}
+              {vehicle.euro_status ? `, ${vehicle.euro_status}` : ''}
             </p>
           </div>
         </div>
@@ -104,7 +115,9 @@ export default function VehicleSummary({
       <div className="glass rounded-2xl p-8">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-xl font-semibold">MOT Status</h2>
-          <span className={`px-4 py-2 rounded-lg border text-sm font-semibold ${getMotStatusColor()}`}>
+          <span
+            className={`px-4 py-2 rounded-lg border text-sm font-semibold ${getMotStatusColor()}`}
+          >
             {motStatus}
           </span>
         </div>

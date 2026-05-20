@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 520" role="img" aria-label="Premium vehicle placeholder">
+  <rect width="900" height="520" fill="#020617"/>
+  <path d="M0 0h900v520H0z" fill="url(#g)"/>
+  <defs>
+    <linearGradient id="g" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#0f172a"/>
+      <stop offset="0.6" stop-color="#111827"/>
+      <stop offset="1" stop-color="#164e63"/>
+    </linearGradient>
+  </defs>
+  <circle cx="680" cy="125" r="190" fill="#22d3ee" opacity="0.12"/>
+  <path d="M180 342c20-70 88-112 180-118h144c75 0 142 42 186 102l58 14c42 10 69 45 68 88H74c1-43 30-77 72-88l34 2Z" fill="#1e293b" stroke="#67e8f9" stroke-opacity="0.28" stroke-width="5"/>
+  <circle cx="226" cy="426" r="54" fill="#020617" stroke="#64748b" stroke-width="13"/>
+  <circle cx="675" cy="426" r="54" fill="#020617" stroke="#64748b" stroke-width="13"/>
+</svg>

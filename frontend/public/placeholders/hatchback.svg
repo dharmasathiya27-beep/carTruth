@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 520" role="img" aria-label="Hatchback silhouette">
+  <defs>
+    <linearGradient id="bg" x1="0" x2="1" y1="0" y2="1">
+      <stop offset="0" stop-color="#0f172a"/>
+      <stop offset="0.55" stop-color="#111827"/>
+      <stop offset="1" stop-color="#164e63"/>
+    </linearGradient>
+  </defs>
+  <rect width="900" height="520" fill="url(#bg)"/>
+  <circle cx="690" cy="125" r="180" fill="#22d3ee" opacity="0.12"/>
+  <path d="M130 384c4-46 35-82 79-94l78-86c25-28 61-44 99-44h111c59 0 112 33 139 86l34 67 54 16c35 11 59 33 69 55H130Z" fill="#1e293b" stroke="#67e8f9" stroke-opacity="0.35" stroke-width="5"/>
+  <path d="M326 190h108v94H250l76-94Zm132 0h37c45 0 85 25 106 65l15 29H458v-94Z" fill="#94a3b8" opacity="0.16"/>
+  <circle cx="246" cy="393" r="54" fill="#020617" stroke="#64748b" stroke-width="13"/>
+  <circle cx="246" cy="393" r="21" fill="#334155"/>
+  <circle cx="646" cy="393" r="54" fill="#020617" stroke="#64748b" stroke-width="13"/>
+  <circle cx="646" cy="393" r="21" fill="#334155"/>
+</svg>

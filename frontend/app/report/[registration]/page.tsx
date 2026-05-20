@@ -13,6 +13,8 @@ import ConfidenceBadge from '@/components/ConfidenceBadge';
 import DataSourceBadge from '@/components/DataSourceBadge';
 import EmptyStateCard from '@/components/EmptyStateCard';
 import PrintFriendlyReportSection from '@/components/PrintFriendlyReportSection';
+import ReportFeedbackCard from '@/components/ReportFeedbackCard';
+import ReportSkeleton from '@/components/ReportSkeleton';
 import ShareReportCard from '@/components/ShareReportCard';
 import { searchVehicle, VehicleReport } from '@/lib/api';
 import {
@@ -22,7 +24,6 @@ import {
   Brain,
   Cloud,
   Gauge,
-  Loader,
   PoundSterling,
   Repeat2,
   ShieldCheck,
@@ -60,19 +61,16 @@ export default function ReportPage() {
   }, [registration]);
 
   if (loading) {
-    return (
-      <>
-        <Header />
-        <main className="min-h-screen bg-slate-950 flex items-center justify-center px-4">
-          <div className="text-center">
-            <Loader className="w-12 h-12 text-blue-400 animate-spin mx-auto mb-4" />
-            <p className="text-xl text-slate-300 mb-2">Analyzing vehicle...</p>
-            <p className="text-sm text-slate-500">Checking MOT history, mileage trends, and generating ownership score</p>
-          </div>
-        </main>
-      </>
-    );
+    return <ReportSkeleton />;
   }
+
+  const errorTitle = error.toLowerCase().includes('invalid')
+    ? 'Invalid Registration'
+    : error.toLowerCase().includes('backend')
+      ? 'Backend Unavailable'
+      : error.toLowerCase().includes('unavailable') || error.toLowerCase().includes('unable')
+        ? 'Official Data Unavailable'
+        : 'Vehicle Not Found';
 
   if (error) {
     return (
@@ -89,7 +87,7 @@ export default function ReportPage() {
             </button>
 
             <ApiErrorCard
-              title={error.toLowerCase().includes('invalid') ? 'Invalid Registration' : 'Vehicle Not Found'}
+              title={errorTitle}
               message={error}
               actionLabel="Try another registration"
               onAction={() => router.push('/')}
@@ -165,10 +163,10 @@ export default function ReportPage() {
                 </div>
                 <div className="space-y-4">
                   <div className="flex flex-wrap items-center gap-3 mb-5">
-                    <h2 className="text-3xl font-bold text-white">
-                      Ownership Score
-                    </h2>
-                    <span className={`px-3 py-1 rounded-lg border text-sm font-bold ${verdictStyle}`}>
+                    <h2 className="text-3xl font-bold text-white">Ownership Score</h2>
+                    <span
+                      className={`px-3 py-1 rounded-lg border text-sm font-bold ${verdictStyle}`}
+                    >
                       {report.ownership_score.verdict}
                     </span>
                   </div>
@@ -185,14 +183,18 @@ export default function ReportPage() {
                           <ShieldAlert className="w-4 h-4" />
                           Maintenance Risk
                         </div>
-                        <p className="text-2xl font-bold">{report.ownership_score.maintenance_risk}</p>
+                        <p className="text-2xl font-bold">
+                          {report.ownership_score.maintenance_risk}
+                        </p>
                       </div>
                       <div className="bg-slate-900/60 border border-white/10 rounded-xl p-4">
                         <div className="flex items-center gap-2 text-slate-400 text-xs mb-2">
                           <PoundSterling className="w-4 h-4" />
                           Yearly Running Cost
                         </div>
-                        <p className="text-2xl font-bold">£{report.ownership_score.yearly_cost_estimate.toLocaleString()}</p>
+                        <p className="text-2xl font-bold">
+                          £{report.ownership_score.yearly_cost_estimate.toLocaleString()}
+                        </p>
                       </div>
                     </div>
                   </div>
@@ -223,7 +225,11 @@ export default function ReportPage() {
                   <h2 className="text-xl font-semibold">Running Cost</h2>
                 </div>
                 <p className="text-4xl font-bold text-white mb-2">
-                  £{(report.ownership_score.yearly_running_cost || report.ownership_score.yearly_cost_estimate).toLocaleString()}
+                  £
+                  {(
+                    report.ownership_score.yearly_running_cost ||
+                    report.ownership_score.yearly_cost_estimate
+                  ).toLocaleString()}
                 </p>
                 <p className="text-sm text-slate-400">Estimated annual ownership cost</p>
               </div>
@@ -233,12 +239,12 @@ export default function ReportPage() {
                   <ShieldAlert className="w-5 h-5 text-amber-400" />
                   <h2 className="text-xl font-semibold">Vehicle Risk Level</h2>
                 </div>
-                <span className={`inline-flex px-4 py-2 rounded-lg border text-lg font-bold ${ratingStyle(report.ownership_score.risk_level)}`}>
+                <span
+                  className={`inline-flex px-4 py-2 rounded-lg border text-lg font-bold ${ratingStyle(report.ownership_score.risk_level)}`}
+                >
                   {report.ownership_score.risk_level}
                 </span>
-                <p className="text-sm text-slate-400 mt-3">
-                  Estimated based on DVLA vehicle data
-                </p>
+                <p className="text-sm text-slate-400 mt-3">Estimated based on DVLA vehicle data</p>
               </div>
 
               <div className="glass rounded-2xl p-6 lg:col-span-2">
@@ -246,7 +252,9 @@ export default function ReportPage() {
                   <ShieldCheck className="w-5 h-5 text-emerald-400" />
                   <h2 className="text-xl font-semibold">Reliability Insight</h2>
                 </div>
-                <span className={`inline-flex px-4 py-2 rounded-lg border text-lg font-bold ${ratingStyle(report.ownership_score.reliability_rating)}`}>
+                <span
+                  className={`inline-flex px-4 py-2 rounded-lg border text-lg font-bold ${ratingStyle(report.ownership_score.reliability_rating)}`}
+                >
                   {report.ownership_score.reliability_rating}
                 </span>
               </div>
@@ -256,7 +264,9 @@ export default function ReportPage() {
                   <Cloud className="w-5 h-5 text-teal-400" />
                   <h2 className="text-xl font-semibold">Environmental Rating</h2>
                 </div>
-                <span className={`inline-flex px-4 py-2 rounded-lg border text-lg font-bold ${ratingStyle(report.ownership_score.environmental_rating)}`}>
+                <span
+                  className={`inline-flex px-4 py-2 rounded-lg border text-lg font-bold ${ratingStyle(report.ownership_score.environmental_rating)}`}
+                >
                   {report.ownership_score.environmental_rating}
                 </span>
               </div>
@@ -270,6 +280,9 @@ export default function ReportPage() {
                   {report.ownership_score.ai_summary}
                 </p>
               </div>
+            </div>
+            <div className="mt-6">
+              <ReportFeedbackCard report={report} />
             </div>
           </section>
 
@@ -344,11 +357,15 @@ export default function ReportPage() {
               <div className="grid sm:grid-cols-2 gap-3">
                 <div className="rounded-xl border border-white/10 bg-slate-900/50 p-4">
                   <p className="text-xs text-slate-400 mb-1">Highest risk category</p>
-                  <p className="text-2xl font-bold text-white">{report.mot_intelligence.highest_risk_category}</p>
+                  <p className="text-2xl font-bold text-white">
+                    {report.mot_intelligence.highest_risk_category}
+                  </p>
                 </div>
                 <div className="rounded-xl border border-white/10 bg-slate-900/50 p-4">
                   <p className="text-xs text-slate-400 mb-1">Highest severity</p>
-                  <p className="text-2xl font-bold text-white">{report.mot_intelligence.highest_severity}</p>
+                  <p className="text-2xl font-bold text-white">
+                    {report.mot_intelligence.highest_severity}
+                  </p>
                 </div>
               </div>
             </div>
@@ -363,7 +380,10 @@ export default function ReportPage() {
                   ? report.mot_intelligence.repeated_issues
                   : ['No repeated patterns']
                 ).map((issue) => (
-                  <span key={issue} className="px-3 py-2 rounded-lg border border-purple-500/25 bg-purple-500/10 text-sm text-purple-100">
+                  <span
+                    key={issue}
+                    className="px-3 py-2 rounded-lg border border-purple-500/25 bg-purple-500/10 text-sm text-purple-100"
+                  >
                     {issue}
                   </span>
                 ))}
@@ -388,7 +408,10 @@ export default function ReportPage() {
               <h2 className="text-xl font-semibold mb-4">Estimated Future Maintenance Concerns</h2>
               <div className="grid md:grid-cols-3 gap-3">
                 {report.mot_intelligence.future_concerns.map((concern) => (
-                  <div key={concern} className="rounded-xl border border-white/10 bg-slate-900/50 p-4 text-sm text-slate-300 leading-relaxed">
+                  <div
+                    key={concern}
+                    className="rounded-xl border border-white/10 bg-slate-900/50 p-4 text-sm text-slate-300 leading-relaxed"
+                  >
                     {concern}
                   </div>
                 ))}
@@ -416,9 +439,7 @@ export default function ReportPage() {
                 <p className="text-sm text-slate-300 leading-relaxed mb-4">
                   {report.ownership_score.score_explanation}
                 </p>
-                <p className="text-xs text-slate-500">
-                  {report.ownership_score.data_basis}
-                </p>
+                <p className="text-xs text-slate-500">{report.ownership_score.data_basis}</p>
               </div>
 
               <div className="glass rounded-2xl p-6">
@@ -464,17 +485,25 @@ export default function ReportPage() {
                     ? report.trust_messages
                     : ['Estimate based on available vehicle data']
                   ).map((message) => (
-                    <div key={message} className="rounded-lg border border-white/10 bg-slate-900/50 px-3 py-2 text-sm text-slate-300">
+                    <div
+                      key={message}
+                      className="rounded-lg border border-white/10 bg-slate-900/50 px-3 py-2 text-sm text-slate-300"
+                    >
                       {message}
                     </div>
                   ))}
                 </div>
                 {report.unavailable_data?.length > 0 && (
                   <div className="mt-4 rounded-lg border border-amber-500/25 bg-amber-500/10 p-4">
-                    <p className="text-sm font-semibold text-amber-200 mb-2">Some fields may be unavailable from official sources</p>
+                    <p className="text-sm font-semibold text-amber-200 mb-2">
+                      Some fields may be unavailable from official sources
+                    </p>
                     <div className="flex flex-wrap gap-2">
                       {report.unavailable_data.map((item) => (
-                        <span key={item} className="px-2 py-1 rounded border border-amber-500/20 bg-slate-950/30 text-xs text-amber-100">
+                        <span
+                          key={item}
+                          className="px-2 py-1 rounded border border-amber-500/20 bg-slate-950/30 text-xs text-amber-100"
+                        >
                           {item}
                         </span>
                       ))}
@@ -488,7 +517,8 @@ export default function ReportPage() {
           {/* Footer */}
           <div className="text-center py-12 border-t border-white/10 no-print">
             <p className="text-slate-500 text-sm mb-4">
-              Data source: {report.data_source}. DVLA vehicle data is used when configured; MOT timeline data remains mock for this MVP.
+              Data source: {report.data_source}. DVLA vehicle data and DVSA MOT history are used
+              when configured, with development fallback data when official sources are unavailable.
             </p>
             {report.warnings.length > 0 && (
               <div className="max-w-2xl mx-auto mb-5 space-y-2">

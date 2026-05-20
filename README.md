@@ -1,246 +1,284 @@
-# CarTruth - MVP Website
+# CarTruth
 
-A premium AI car intelligence platform that provides detailed vehicle reports for UK registration numbers.
+CarTruth is a UK vehicle intelligence MVP built with a Next.js 14 frontend and a FastAPI backend. It searches a registration number, calls official vehicle data services from the backend, and presents a premium report with ownership scoring, MOT intelligence, mileage trends, trust messaging, and share/print utilities.
 
-## Features
+## Current Features
 
-✅ **Landing Page** - Modern, premium design with hero section and feature cards
-✅ **Vehicle Search** - Enter UK registration number to search
-✅ **Vehicle Report** - Complete vehicle information display:
-  - Vehicle details (make, model, year, fuel type, engine size, colour, tax status)
-  - MOT status and history timeline with defects/advisory items
-  - Mileage trends and analysis
-  - AI-generated ownership score (0-100)
-  - Plain English insights:
-    - What looks good
-    - Potential problems
-    - Expected yearly running costs
-    - Should you buy it? recommendation
+- UK registration search through the FastAPI backend
+- DVLA Vehicle Enquiry API integration for vehicle, tax, MOT status, emissions, and registration data
+- DVSA MOT History API integration with OAuth 2.0 client credentials
+- Safe mock/fallback mode for local development and API failures
+- Normalised MOT schema shared by mock and DVSA data
+- Rule-based ownership score, risk level, running cost estimate, reliability rating, and environmental rating
+- MOT advisory classification, repeated issue detection, severity badges, and maintenance warnings
+- Mileage trend, latest mileage, maintenance window, and ownership pattern insights
+- Confidence and data source messaging
+- Share link, print report, and PDF placeholder actions
 
-✅ **Mock Data** - Pre-loaded with sample vehicles for testing
-✅ **Responsive Design** - Works on desktop, tablet, and mobile
-✅ **Premium UI** - Glass morphism, gradients, smooth animations
+CarTruth does not currently include login, payments, a database, admin tooling, or LLM-based analysis.
 
 ## Project Structure
 
-```
+```text
 carTruth/
-├── backend/                    # FastAPI backend
+├── backend/
 │   ├── app/
-│   │   ├── main.py            # FastAPI app entry
+│   │   ├── config.py
+│   │   ├── main.py
 │   │   ├── models/
-│   │   │   └── schemas.py      # Pydantic models
-│   │   ├── services/
-│   │   │   └── vehicle_service.py  # Mock data & business logic
-│   │   └── routes/
-│   │       └── vehicle.py      # API endpoints
-│   ├── run.py                 # Server entry point
-│   └── requirements.txt        # Python dependencies
-│
-└── frontend/                   # Next.js frontend
-    ├── app/
-    │   ├── page.tsx           # Landing page
-    │   ├── layout.tsx         # Root layout
-    │   └── report/[registration]/
-    │       └── page.tsx       # Vehicle report page
-    ├── components/            # React components
-    │   ├── Header.tsx
-    │   ├── SearchBox.tsx
-    │   ├── ScoreDisplay.tsx
-    │   ├── VehicleSummary.tsx
-    │   ├── MOTTimeline.tsx
-    │   └── MileageTrend.tsx
-    ├── lib/
-    │   └── api.ts            # API client
-    ├── styles/
-    │   └── globals.css       # Global styles
-    ├── package.json
-    ├── next.config.js
-    ├── tailwind.config.ts
-    └── tsconfig.json
+│   │   │   ├── mot_schema.py
+│   │   │   └── schemas.py
+│   │   ├── routes/
+│   │   │   └── vehicle.py
+│   │   └── services/
+│   │       ├── dvla_service.py
+│   │       ├── dvsa_auth_service.py
+│   │       ├── dvsa_service.py
+│   │       ├── lookup_cache.py
+│   │       ├── mock_vehicle_service.py
+│   │       ├── mot_analysis_service.py
+│   │       ├── mot_data_normalizer.py
+│   │       ├── vehicle_analysis_service.py
+│   │       └── vehicle_service.py
+│   ├── tests/
+│   ├── requirements.txt
+│   └── run.py
+├── frontend/
+│   ├── app/
+│   ├── components/
+│   ├── lib/
+│   ├── styles/
+│   └── package.json
+├── .env.example
+├── pyproject.toml
+└── README.md
 ```
 
-## Getting Started
+## Environment Variables
 
-### Prerequisites
+Copy the example file into the backend folder:
 
-- **Node.js** 18+ (for frontend)
-- **Python** 3.9+ (for backend)
-- **npm** or **yarn** (for frontend package manager)
+```bash
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env.local
+```
 
-### Backend Setup
+Set these values in `backend/.env`:
 
-1. **Navigate to backend directory:**
-   ```bash
-   cd backend
-   ```
+```bash
+APP_ENV=development
+PORT=8000
+FRONTEND_URL=http://localhost:3000
+CORS_ALLOWED_ORIGINS=http://localhost:3000,http://127.0.0.1:3000
+USE_MOCK_DATA=false
+ALLOW_MOCK_MOT_FALLBACK=true
 
-2. **Create a Python virtual environment:**
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
+DVLA_API_KEY=your_dvla_key
+DVLA_API_BASE_URL=https://driver-vehicle-licensing.api.gov.uk/vehicle-enquiry/v1/vehicles
 
-3. **Install dependencies:**
-   ```bash
-   pip install -r requirements.txt
-   ```
+DVSA_CLIENT_ID=your_dvsa_client_id
+DVSA_CLIENT_SECRET=your_dvsa_client_secret
+DVSA_API_KEY=your_dvsa_api_key
+DVSA_SCOPE_URL=https://tapi.dvsa.gov.uk/.default
+DVSA_TOKEN_URL=https://login.microsoftonline.com/<tenant-id>/oauth2/v2.0/token
+DVSA_API_BASE_URL=https://history.mot.api.gov.uk/v1/trade/vehicles/registration
+```
 
-4. **Run the server:**
-   ```bash
-   python run.py
-   ```
+Secrets stay in the backend only. The frontend calls CarTruth's FastAPI backend and never calls DVLA or DVSA directly.
 
-   The API will be available at `http://localhost:8000`
-   - Interactive API docs: `http://localhost:8000/docs`
+Set this value in `frontend/.env.local`:
 
-### Frontend Setup
+```bash
+NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+```
 
-1. **In a new terminal, navigate to frontend directory:**
-   ```bash
-   cd frontend
-   ```
+## Run Locally
 
-2. **Install dependencies:**
-   ```bash
-   npm install
-   ```
+Start the backend:
 
-3. **Run the development server:**
-   ```bash
-   npm run dev
-   ```
+```bash
+cd backend
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload
+```
 
-   The frontend will be available at `http://localhost:3000`
+Start the frontend in another terminal:
 
-## Testing the MVP
+```bash
+cd frontend
+npm install
+npm run dev
+```
 
-Once both servers are running:
+Open `http://localhost:3000` and search a registration such as `SW60DGO`.
 
-1. **Open** `http://localhost:3000` in your browser
-2. **Try these example registrations:**
-   - `AB20OXY` - 2020 BMW 3 Series Diesel
-   - `YM70EUH` - 2020 Toyota Corolla Hybrid
-   - `GX15EWS` - 2015 Ford Fiesta Petrol (with MOT failures)
-   - `MK22XYZ` - 2022 Tesla Model 3 Electric
+## Developer Commands
 
-Each will generate a unique report with mock MOT history, mileage trends, and AI-generated ownership scores.
+Backend:
 
-## Mock Data
+```bash
+cd backend
+venv/bin/python -m black app tests
+venv/bin/python -m isort app tests
+venv/bin/python -m pytest
+```
 
-The backend includes mock data for the above registrations. In production, replace the `vehicle_service.py` with real API calls to:
-- **DVLA API** - Vehicle registration and tax information
-- **DVSA API** - MOT history and test results
+Frontend:
 
-All integration points are marked with `# TODO:` comments in the code.
-
-## Technology Stack
-
-### Backend
-- **FastAPI** - Modern Python web framework
-- **Pydantic** - Data validation and settings management
-- **Uvicorn** - ASGI server
-
-### Frontend
-- **Next.js 14** - React framework with App Router
-- **React 18** - UI library
-- **Tailwind CSS** - Utility-first styling
-- **Lucide React** - Icon library
-- **Axios** - HTTP client
+```bash
+cd frontend
+npm run format
+npm run lint
+npm run build
+```
 
 ## API Endpoints
 
-### POST `/api/vehicle/search`
+### `POST /api/vehicle/search`
+
 Search for a vehicle by registration number.
 
-**Request:**
 ```json
 {
-  "registration": "AB20OXY"
+  "registration": "SW60DGO"
 }
 ```
 
-**Response:**
+The response includes:
+
+- `vehicle`
+- `current_mot_status`
+- `mot_valid_until`
+- `mot_history`
+- `mileage_history`
+- `mot_intelligence`
+- `ownership_score`
+- `data_source`
+- `confidence_level`
+- `trust_messages`
+- `warnings`
+
+### `GET /api/vehicle/health`
+
+Returns backend health status.
+
+### `GET /health`
+
+Top-level deployment health check. It returns backend status and whether DVLA/DVSA config exists without exposing secret values.
+
+## Caching
+
+The backend uses a small in-memory TTL cache for DVLA and DVSA registration lookups. This reduces repeated external API calls during local development and normal browsing. The cache is intentionally simple and can be replaced later with Redis or another production cache if traffic requires it.
+
+## Testing Notes
+
+The backend tests cover invalid registration handling, API failure fallback, mock fallback behavior, MOT advisory analysis, and mileage inconsistency detection.
+
+## Deployment
+
+### Backend On Render
+
+Create a new Render Web Service from this repository.
+
+Recommended settings:
+
+- Root directory: `backend`
+- Build command: `pip install -r requirements.txt`
+- Start command: `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+- Health check path: `/health`
+
+Required backend environment variables:
+
+```bash
+APP_ENV=production
+PORT=10000
+FRONTEND_URL=https://your-frontend.vercel.app
+CORS_ALLOWED_ORIGINS=https://your-frontend.vercel.app
+USE_MOCK_DATA=false
+ALLOW_MOCK_MOT_FALLBACK=false
+
+DVLA_API_KEY=...
+DVLA_API_BASE_URL=https://driver-vehicle-licensing.api.gov.uk/vehicle-enquiry/v1/vehicles
+DVLA_TIMEOUT_SECONDS=8
+
+DVSA_CLIENT_ID=...
+DVSA_CLIENT_SECRET=...
+DVSA_API_KEY=...
+DVSA_SCOPE_URL=https://tapi.dvsa.gov.uk/.default
+DVSA_TOKEN_URL=https://login.microsoftonline.com/<tenant-id>/oauth2/v2.0/token
+DVSA_API_BASE_URL=https://history.mot.api.gov.uk/v1/trade/vehicles/registration
+DVSA_TOKEN_TIMEOUT_SECONDS=10
+DVSA_TIMEOUT_SECONDS=10
+```
+
+Render provides `PORT` automatically for web services. Keep the start command using `$PORT`.
+
+### Frontend On Vercel
+
+Create a new Vercel project from this repository.
+
+Recommended settings:
+
+- Root directory: `frontend`
+- Framework preset: Next.js
+- Build command: `npm run build`
+- Output: Vercel default
+
+Required frontend environment variable:
+
+```bash
+NEXT_PUBLIC_API_BASE_URL=https://your-backend.onrender.com
+```
+
+After Vercel gives you a production URL, add that URL to the backend `FRONTEND_URL` and `CORS_ALLOWED_ORIGINS` values in Render.
+
+### Test Production Connection
+
+Check backend health:
+
+```bash
+curl https://your-backend.onrender.com/health
+```
+
+Expected shape:
+
 ```json
 {
-  "vehicle": {
-    "make": "BMW",
-    "model": "3 Series",
-    "year": 2020,
-    "colour": "Black",
-    "fuel_type": "Diesel",
-    "engine_size": 2.0,
-    "registration": "AB20OXY",
-    "tax_status": "Taxed",
-    "tax_due_date": "2025-06-30"
-  },
-  "current_mot_status": "Valid",
-  "mot_valid_until": "2025-11-15",
-  "mot_history": [...],
-  "mileage_history": [...],
-  "ownership_score": {
-    "score": 82,
-    "summary": "Ownership Score: 82/100",
-    "what_looks_good": "Recent model year; Lower than average mileage for age",
-    "potential_problems": "No significant issues identified",
-    "expected_yearly_cost": "£1400/year",
-    "should_buy_recommendation": "This looks like a solid choice..."
+  "status": "ok",
+  "service": "cartruth-api",
+  "environment": "production",
+  "integrations": {
+    "dvla_configured": true,
+    "dvsa_configured": true
   }
 }
 ```
 
-### GET `/api/vehicle/health`
-Health check endpoint.
+Check a registration lookup:
 
-## Ownership Score Algorithm
-
-The score is calculated based on:
-- **Vehicle age** (-15 points if >10 years, +5 if <3 years)
-- **Mileage** (-12 points if significantly higher than average, +8 if lower)
-- **Fuel type** (+10 for Electric, +5 for Hybrid)
-- **MOT history** (-20 for failed tests, -8 for multiple advisories)
-- **Maintenance patterns** (based on defect frequency)
-
-Result: 0-100 scale with plain English interpretation.
-
-## Future Enhancements
-
-- [ ] Real DVLA API integration
-- [ ] Real DVSA API integration
-- [ ] User authentication & saved vehicles
-- [ ] Vehicle comparison tool
-- [ ] Export reports as PDF
-- [ ] Enhanced AI analysis with ML models
-- [ ] Mobile app (React Native)
-- [ ] Admin dashboard for monitoring
-- [ ] Rate limiting and usage analytics
-
-## Production Deployment
-
-### Backend
 ```bash
-# Using Gunicorn in production
-pip install gunicorn
-gunicorn app.main:app --workers 4 --worker-class uvicorn.workers.UvicornWorker
+curl -X POST https://your-backend.onrender.com/api/vehicle/search \
+  -H "Content-Type: application/json" \
+  -d '{"registration":"SW60DGO"}'
 ```
 
-### Frontend
-```bash
-npm run build
-npm start
-```
+Then open the Vercel frontend and search the same registration.
 
-Deploy on Vercel (recommended for Next.js), Netlify, or your own infrastructure.
+## Production Checklist
 
-## License
+- DVLA API key added to Render.
+- DVSA client ID, client secret, API key, scope URL, token URL, and MOT API base URL added to Render.
+- `APP_ENV=production`.
+- `USE_MOCK_DATA=false`.
+- `ALLOW_MOCK_MOT_FALLBACK=false`, unless you intentionally want fallback data in production.
+- `FRONTEND_URL` points to the Vercel production URL.
+- `CORS_ALLOWED_ORIGINS` includes the Vercel production URL.
+- Vercel has `NEXT_PUBLIC_API_BASE_URL` set to the Render backend URL.
+- `https://your-backend.onrender.com/health` returns `status: ok`.
+- A known valid registration lookup returns a report.
 
-MIT
+## Status
 
-## Support
-
-For questions or issues, please check the code comments marked with `# TODO:` and `# NOTE:` which indicate areas for future implementation.
-
----
-
-**Built with:** Next.js, FastAPI, Tailwind CSS, Python
-**Status:** MVP (Version 0.1.0)
+MVP in active development. DVLA and DVSA integrations are live backend features, with mock/fallback data retained for resilience and local development.
