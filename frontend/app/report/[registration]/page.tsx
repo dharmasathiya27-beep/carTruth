@@ -3,14 +3,11 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Header from '@/components/Header';
-import ScoreDisplay from '@/components/ScoreDisplay';
 import VehicleHeroSection from '@/components/VehicleHeroSection';
 import VehicleSummary from '@/components/VehicleSummary';
 import MOTTimeline from '@/components/MOTTimeline';
 import MileageTrend from '@/components/MileageTrend';
 import ApiErrorCard from '@/components/ApiErrorCard';
-import ConfidenceBadge from '@/components/ConfidenceBadge';
-import DataSourceBadge from '@/components/DataSourceBadge';
 import EmptyStateCard from '@/components/EmptyStateCard';
 import PrintFriendlyReportSection from '@/components/PrintFriendlyReportSection';
 import ReportFeedbackCard from '@/components/ReportFeedbackCard';
@@ -120,12 +117,6 @@ export default function ReportPage() {
     },
   ];
 
-  const verdictStyle = {
-    BUY: 'bg-green-500/15 text-green-300 border-green-500/30',
-    INSPECT: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-    AVOID: 'bg-red-500/15 text-red-300 border-red-500/30',
-  }[report.ownership_score.verdict];
-
   const ratingStyle = (rating: string) => {
     if (['Low', 'Strong', 'Excellent', 'Good'].includes(rating)) {
       return 'text-emerald-300 border-emerald-500/25 bg-emerald-500/10';
@@ -135,6 +126,18 @@ export default function ReportPage() {
     }
     return 'text-amber-300 border-amber-500/25 bg-amber-500/10';
   };
+
+  const confidenceReason = {
+    High: 'Core DVLA vehicle fields and MOT history are available, so the report can combine official facts with richer CarTruth analysis.',
+    Medium:
+      'Some official fields are available, but the report may be missing supporting history or secondary data points.',
+    Low: 'Important official fields are unavailable, so CarTruth keeps the analysis conservative and marks estimates clearly.',
+  }[report.confidence_level];
+
+  const sourcesUsed = [
+    report.data_source === 'dvla' ? 'DVLA vehicle data' : 'Development fallback vehicle data',
+    report.mot_history.length > 0 ? 'DVSA MOT history' : 'MOT history unavailable',
+  ];
 
   return (
     <>
@@ -153,55 +156,6 @@ export default function ReportPage() {
           </button>
 
           <VehicleHeroSection report={report} />
-
-          {/* Main intelligence section */}
-          <div className="mb-12">
-            <div className="glass rounded-2xl p-12">
-              <div className="grid md:grid-cols-2 gap-12 items-center">
-                <div>
-                  <ScoreDisplay score={report.ownership_score.score} />
-                </div>
-                <div className="space-y-4">
-                  <div className="flex flex-wrap items-center gap-3 mb-5">
-                    <h2 className="text-3xl font-bold text-white">Ownership Score</h2>
-                    <span
-                      className={`px-3 py-1 rounded-lg border text-sm font-bold ${verdictStyle}`}
-                    >
-                      {report.ownership_score.verdict}
-                    </span>
-                  </div>
-                  <div className="space-y-5">
-                    <div>
-                      <h3 className="text-sm font-semibold text-blue-400 mb-2">RECOMMENDATION</h3>
-                      <p className="text-white leading-relaxed">
-                        {report.ownership_score.should_buy_recommendation}
-                      </p>
-                    </div>
-                    <div className="grid sm:grid-cols-2 gap-3">
-                      <div className="bg-slate-900/60 border border-white/10 rounded-xl p-4">
-                        <div className="flex items-center gap-2 text-slate-400 text-xs mb-2">
-                          <ShieldAlert className="w-4 h-4" />
-                          Maintenance Risk
-                        </div>
-                        <p className="text-2xl font-bold">
-                          {report.ownership_score.maintenance_risk}
-                        </p>
-                      </div>
-                      <div className="bg-slate-900/60 border border-white/10 rounded-xl p-4">
-                        <div className="flex items-center gap-2 text-slate-400 text-xs mb-2">
-                          <PoundSterling className="w-4 h-4" />
-                          Yearly Running Cost
-                        </div>
-                        <p className="text-2xl font-bold">
-                          £{report.ownership_score.yearly_cost_estimate.toLocaleString()}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
 
           <section className="mb-12">
             <div className="grid lg:grid-cols-6 gap-6">
@@ -431,12 +385,52 @@ export default function ReportPage() {
               <div className="glass rounded-2xl p-6">
                 <div className="flex items-center gap-2 mb-5">
                   <Brain className="w-5 h-5 text-blue-400" />
-                  <h2 className="text-xl font-semibold">Confidence Explanation</h2>
+                  <h2 className="text-xl font-semibold">Trust & Data Confidence</h2>
                 </div>
-                <p className="text-sm text-slate-300 leading-relaxed mb-4">
-                  {report.ownership_score.score_explanation}
-                </p>
-                <p className="text-xs text-slate-500">{report.ownership_score.data_basis}</p>
+                <div className="mb-5 flex flex-wrap gap-2">
+                  <span className="rounded-lg border border-blue-500/25 bg-blue-500/10 px-3 py-2 text-sm font-semibold text-blue-200">
+                    {report.confidence_level} confidence
+                  </span>
+                  <span className="rounded-lg border border-white/10 bg-slate-900/50 px-3 py-2 text-sm text-slate-300">
+                    Source: {report.data_source}
+                  </span>
+                </div>
+                <p className="mb-5 text-sm leading-relaxed text-slate-300">{confidenceReason}</p>
+                <div className="grid gap-3">
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Data sources used
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {sourcesUsed.map((source) => (
+                        <span
+                          key={source}
+                          className="rounded-lg border border-white/10 bg-slate-900/50 px-3 py-2 text-xs text-slate-300"
+                        >
+                          {source}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Missing or unavailable data
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {(report.unavailable_data?.length
+                        ? report.unavailable_data
+                        : ['No missing data flagged']
+                      ).map((item) => (
+                        <span
+                          key={item}
+                          className="rounded-lg border border-white/10 bg-slate-900/50 px-3 py-2 text-xs text-slate-300"
+                        >
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
               </div>
 
               <div className="glass rounded-2xl p-6">
@@ -469,46 +463,7 @@ export default function ReportPage() {
           </section>
 
           <section className="mb-12 no-print">
-            <div className="grid lg:grid-cols-2 gap-6">
-              <ShareReportCard report={report} />
-
-              <div className="glass rounded-2xl p-6">
-                <div className="flex flex-wrap items-center gap-3 mb-4">
-                  <DataSourceBadge source={report.data_source} />
-                  <ConfidenceBadge level={report.confidence_level} />
-                </div>
-                <div className="grid gap-3">
-                  {(report.trust_messages?.length
-                    ? report.trust_messages
-                    : ['Estimate based on available vehicle data']
-                  ).map((message) => (
-                    <div
-                      key={message}
-                      className="rounded-lg border border-white/10 bg-slate-900/50 px-3 py-2 text-sm text-slate-300"
-                    >
-                      {message}
-                    </div>
-                  ))}
-                </div>
-                {report.unavailable_data?.length > 0 && (
-                  <div className="mt-4 rounded-lg border border-amber-500/25 bg-amber-500/10 p-4">
-                    <p className="text-sm font-semibold text-amber-200 mb-2">
-                      Some fields may be unavailable from official sources
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {report.unavailable_data.map((item) => (
-                        <span
-                          key={item}
-                          className="px-2 py-1 rounded border border-amber-500/20 bg-slate-950/30 text-xs text-amber-100"
-                        >
-                          {item}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
+            <ShareReportCard report={report} />
           </section>
 
           <section className="mb-12">
@@ -518,8 +473,8 @@ export default function ReportPage() {
           {/* Footer */}
           <div className="text-center py-12 border-t border-white/10 no-print">
             <p className="text-slate-500 text-sm mb-4">
-              Data source: {report.data_source}. DVLA vehicle data and DVSA MOT history are used
-              when configured, with development fallback data when official sources are unavailable.
+              Data provided by DVLA and DVSA where configured. CarTruth insights are estimates, not
+              mechanical inspections.
             </p>
             {report.warnings.length > 0 && (
               <div className="max-w-2xl mx-auto mb-5 space-y-2">

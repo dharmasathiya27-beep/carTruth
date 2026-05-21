@@ -132,9 +132,7 @@ export default function VehicleVisualCard({ vehicle }: VehicleVisualCardProps) {
               <p className="text-xs uppercase tracking-[0.24em] text-slate-300">
                 {profile.manufacturer.logoText}
               </p>
-              <h2 className="mt-1 text-2xl font-bold text-white">
-                {vehicle.make || 'Unknown Make'} {vehicle.model || ''}
-              </h2>
+              <p className="mt-1 text-sm font-semibold text-slate-200">Manufacturer identity</p>
             </div>
           </div>
         </div>
@@ -149,7 +147,7 @@ export default function VehicleVisualCard({ vehicle }: VehicleVisualCardProps) {
             {profile.bodyType} silhouette
           </div>
           <p className="rounded-lg border border-white/10 bg-black/25 px-3 py-2 text-xs leading-relaxed text-slate-300">
-            {profile.disclaimer}
+            Representative visual only.
           </p>
         </div>
       </div>
