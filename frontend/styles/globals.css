@@ -40,6 +40,23 @@ a {
   @apply bg-white/10 backdrop-blur-md border border-white/10;
 }
 
+.vehicle-visual-sheen {
+  animation: vehicle-sheen 8s ease-in-out infinite;
+}
+
+@keyframes vehicle-sheen {
+  0%,
+  100% {
+    opacity: 0.16;
+    transform: translateX(-14%) rotate(-12deg);
+  }
+
+  50% {
+    opacity: 0.34;
+    transform: translateX(22%) rotate(-12deg);
+  }
+}
+
 @media print {
   @page {
     margin: 16mm;

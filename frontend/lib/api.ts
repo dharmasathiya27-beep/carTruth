@@ -31,6 +31,10 @@ export interface VehicleDetails {
   month_of_first_registration?: string;
   wheelplan?: string;
   euro_status?: string;
+  body_style?: string;
+  bodyStyle?: string;
+  body_type?: string;
+  bodyType?: string;
 }
 
 export interface MOTAdvisory {

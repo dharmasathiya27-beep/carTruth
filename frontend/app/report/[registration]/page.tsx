@@ -281,9 +281,6 @@ export default function ReportPage() {
                 </p>
               </div>
             </div>
-            <div className="mt-6">
-              <ReportFeedbackCard report={report} />
-            </div>
           </section>
 
           <section className="grid lg:grid-cols-3 gap-6 mb-12">
@@ -512,6 +509,10 @@ export default function ReportPage() {
                 )}
               </div>
             </div>
+          </section>
+
+          <section className="mb-12">
+            <ReportFeedbackCard report={report} />
           </section>
 
           {/* Footer */}

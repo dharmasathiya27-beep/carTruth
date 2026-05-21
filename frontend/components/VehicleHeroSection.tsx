@@ -1,8 +1,9 @@
 'use client';
 
-import { CalendarDays, Fuel, Gauge, Milestone, ShieldCheck } from 'lucide-react';
+import { CalendarDays, Car, Fuel, Gauge, Milestone, Palette, ShieldCheck } from 'lucide-react';
 import { VehicleReport } from '@/lib/api';
-import VehicleIdentityCard from '@/components/VehicleIdentityCard';
+import VehicleVisualCard from '@/components/VehicleVisualCard';
+import { getVehicleVisualProfile } from '@/lib/vehicleVisualProfile';
 
 interface VehicleHeroSectionProps {
   report: VehicleReport;
@@ -17,6 +18,57 @@ export default function VehicleHeroSection({ report }: VehicleHeroSectionProps) 
   const latestMileage = [...(report.mileage_history || [])].sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
   )[0];
+  const visualProfile = getVehicleVisualProfile(vehicle);
+  const engine = vehicle.engine_capacity_cc
+    ? `${vehicle.engine_capacity_cc.toLocaleString()} cc`
+    : vehicle.engine_size
+      ? `${vehicle.engine_size}L`
+      : 'N/A';
+
+  const detailCards = [
+    {
+      label: 'Body',
+      value: visualProfile.bodyType,
+      icon: Car,
+    },
+    {
+      label: 'Colour',
+      value: vehicle.colour || visualProfile.theme.name,
+      icon: Palette,
+    },
+    {
+      label: 'Fuel',
+      value: vehicle.fuel_type || 'N/A',
+      icon: Fuel,
+    },
+    {
+      label: 'Engine',
+      value: engine,
+      icon: Gauge,
+    },
+    {
+      label: 'MOT',
+      value: report.current_mot_status || 'Unknown',
+      detail: motValidUntil ? `Valid until: ${motValidUntil}` : undefined,
+      icon: CalendarDays,
+    },
+    {
+      label: 'Mileage',
+      value: latestMileage ? `${latestMileage.mileage.toLocaleString()} miles` : 'N/A',
+      detail: latestMileage
+        ? `Last updated: ${new Date(latestMileage.date).toLocaleDateString('en-GB')}`
+        : undefined,
+      icon: Milestone,
+    },
+    {
+      label: 'Tax',
+      value: vehicle.tax_status || 'N/A',
+      detail: vehicle.tax_due_date
+        ? `Due: ${new Date(vehicle.tax_due_date).toLocaleDateString('en-GB')}`
+        : undefined,
+      icon: ShieldCheck,
+    },
+  ];
 
   return (
     <section className="mb-12">
@@ -43,61 +95,30 @@ export default function VehicleHeroSection({ report }: VehicleHeroSectionProps) 
             {age !== null ? ` • ${age} years old` : ''} • {vehicle.colour || 'Colour unavailable'}
           </p>
 
-          <div className="grid sm:grid-cols-2 xl:grid-cols-4 gap-3">
-            <div className="rounded-xl border border-white/10 bg-slate-900/50 p-4">
-              <div className="flex items-center gap-2 text-slate-400 text-xs mb-2">
-                <Fuel className="w-4 h-4" />
-                Fuel
-              </div>
-              <p className="text-xl font-bold">{vehicle.fuel_type || 'N/A'}</p>
-            </div>
-            <div className="rounded-xl border border-white/10 bg-slate-900/50 p-4">
-              <div className="flex items-center gap-2 text-slate-400 text-xs mb-2">
-                <Gauge className="w-4 h-4" />
-                Engine
-              </div>
-              <p className="text-xl font-bold">
-                {vehicle.engine_capacity_cc
-                  ? `${vehicle.engine_capacity_cc} cc`
-                  : vehicle.engine_size
-                    ? `${vehicle.engine_size}L`
-                    : 'N/A'}
-              </p>
-            </div>
-            <div className="rounded-xl border border-white/10 bg-slate-900/50 p-4">
-              <div className="flex items-center gap-2 text-slate-400 text-xs mb-2">
-                <CalendarDays className="w-4 h-4" />
-                MOT
-              </div>
-              <p className="text-xl font-bold">{report.current_mot_status || 'Unknown'}</p>
-              {motValidUntil && (
-                <p className="mt-1 text-xs font-medium text-slate-400">
-                  Valid until: {motValidUntil}
-                </p>
-              )}
-            </div>
-            <div className="rounded-xl border border-white/10 bg-slate-900/50 p-4">
-              <div className="flex items-center gap-2 text-slate-400 text-xs mb-2">
-                <Milestone className="w-4 h-4" />
-                Mileage
-              </div>
-              <p className="text-xl font-bold">
-                {latestMileage ? `${latestMileage.mileage.toLocaleString()} miles` : 'N/A'}
-              </p>
-              {latestMileage && (
-                <p className="mt-1 text-xs font-medium text-slate-400">
-                  Last updated: {new Date(latestMileage.date).toLocaleDateString('en-GB')}
-                </p>
-              )}
-            </div>
+          <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-3">
+            {detailCards.map((detail) => {
+              const Icon = detail.icon;
+
+              return (
+                <div
+                  key={detail.label}
+                  className="rounded-xl border border-white/10 bg-slate-900/50 p-4"
+                >
+                  <div className="flex items-center gap-2 text-slate-400 text-xs mb-2">
+                    <Icon className="w-4 h-4" />
+                    {detail.label}
+                  </div>
+                  <p className="text-xl font-bold capitalize">{detail.value}</p>
+                  {detail.detail && (
+                    <p className="mt-1 text-xs font-medium text-slate-400">{detail.detail}</p>
+                  )}
+                </div>
+              );
+            })}
           </div>
         </div>
 
-        <VehicleIdentityCard
-          vehicle={vehicle}
-          motStatus={report.current_mot_status}
-          dataSource={report.data_source}
-        />
+        <VehicleVisualCard vehicle={vehicle} />
       </div>
     </section>
   );
