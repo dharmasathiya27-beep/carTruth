@@ -234,10 +234,70 @@ export default function ReportPage() {
                   <div className="flex items-center gap-2 mb-4">
                     <Sparkles className="w-5 h-5 text-purple-400" />
                     <h2 className="text-xl font-semibold">AI Summary</h2>
+                    {report.ai_report && (
+                      <span className="rounded-full border border-purple-500/25 bg-purple-500/10 px-2.5 py-1 text-xs font-bold uppercase tracking-wide text-purple-200">
+                        AI Insights Beta
+                      </span>
+                    )}
                   </div>
-                  <p className="text-sm text-slate-300 leading-relaxed">
-                    {report.ownership_score.ai_summary}
-                  </p>
+                  {report.ai_report ? (
+                    <div className="space-y-4 text-sm text-slate-300">
+                      <div>
+                        <p className="text-base font-bold text-white">
+                          {report.ai_report.headline}
+                        </p>
+                        <p className="mt-2 leading-relaxed">{report.ai_report.summary}</p>
+                      </div>
+                      <div className="rounded-xl border border-purple-500/20 bg-purple-500/10 p-3">
+                        <p className="text-xs uppercase tracking-[0.16em] text-purple-200">
+                          Buy verdict
+                        </p>
+                        <p className="mt-1 font-semibold text-white">
+                          {report.ai_report.buyVerdict}
+                        </p>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                            Top risks
+                          </p>
+                          <div className="space-y-1">
+                            {(report.ai_report.topRisks.length
+                              ? report.ai_report.topRisks
+                              : ['No major AI-highlighted risks']
+                            ).map((risk) => (
+                              <p key={risk} className="leading-relaxed">
+                                {risk}
+                              </p>
+                            ))}
+                          </div>
+                        </div>
+                        <div>
+                          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                            Positive signs
+                          </p>
+                          <div className="space-y-1">
+                            {(report.ai_report.positiveSigns.length
+                              ? report.ai_report.positiveSigns
+                              : ['No additional AI-highlighted positives']
+                            ).map((sign) => (
+                              <p key={sign} className="leading-relaxed">
+                                {sign}
+                              </p>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                      <p className="leading-relaxed">{report.ai_report.ownershipAdvice}</p>
+                      <p className="text-xs leading-relaxed text-slate-400">
+                        {report.ai_report.confidenceNote}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-sm leading-relaxed text-slate-300">
+                      {report.ownership_score.ai_summary}
+                    </p>
+                  )}
                 </div>
               </div>
             </section>

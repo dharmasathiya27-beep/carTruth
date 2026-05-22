@@ -63,10 +63,15 @@ class Settings:
     cache_dvla_ttl_seconds: int = _env_int("CACHE_DVLA_TTL_SECONDS", 15 * 60)
     cache_dvsa_ttl_seconds: int = _env_int("CACHE_DVSA_TTL_SECONDS", 15 * 60)
     cache_report_ttl_seconds: int = _env_int("CACHE_REPORT_TTL_SECONDS", 5 * 60)
+    report_cache_ttl_hours: int = _env_int("REPORT_CACHE_TTL_HOURS", 24)
+    report_cache_version: str = os.getenv("REPORT_CACHE_VERSION", "v1")
     enable_llm_report_writer: bool = _env_bool("ENABLE_LLM_REPORT_WRITER", False)
+    supabase_url: str = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
+    supabase_service_role_key: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
-    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
     gemini_timeout_seconds: int = _env_int("GEMINI_TIMEOUT_SECONDS", 8)
+    ai_report_version: str = os.getenv("AI_REPORT_VERSION", "v1")
 
     @property
     def is_production(self) -> bool:

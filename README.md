@@ -10,11 +10,12 @@ CarTruth is a UK vehicle intelligence MVP built with a Next.js 14 frontend and a
 - Safe mock/fallback mode for local development and API failures
 - Normalised MOT schema shared by mock and DVSA data
 - Rule-based ownership score, risk level, running cost estimate, reliability rating, and environmental rating
-- Optional Gemini report-writer enhancement for buyer-friendly narrative summaries, with the rule engine retained as the source of truth
+- Optional Gemini report writer for buyer-friendly JSON insights; it is disabled by default and the rule engine remains the source of truth
 - MOT advisory classification, repeated issue detection, severity badges, and maintenance warnings
 - Mileage trend, latest mileage, maintenance window, and ownership pattern insights
 - Confidence and data source messaging
 - Supabase feedback storage in the `cartruth.feedback` table using frontend-safe anon credentials
+- Supabase persistent report caching through `cartruth.vehicle_source_cache`, `cartruth.vehicle_report_cache`, and `cartruth.ai_report_cache`
 - Share link, print report, summary copy, and real PDF download actions
 - Backend-generated premium PDF reports through Playwright at `/api/vehicle/{registration}/pdf`
 
@@ -37,12 +38,15 @@ carTruth/
 │   │       ├── dvla_service.py
 │   │       ├── dvsa_auth_service.py
 │   │       ├── dvsa_service.py
+│   │       ├── gemini_report_service.py
 │   │       ├── gemini_report_writer.py
 │   │       ├── lookup_cache.py
 │   │       ├── mock_vehicle_service.py
 │   │       ├── mot_analysis_service.py
 │   │       ├── mot_data_normalizer.py
 │   │       ├── pdf_service.py
+│   │       ├── source_hash_service.py
+│   │       ├── supabase_cache_service.py
 │   │       ├── vehicle_analysis_service.py
 │   │       └── vehicle_service.py
 │   ├── tests/
@@ -92,14 +96,19 @@ CACHE_ENABLED=true
 CACHE_DVLA_TTL_SECONDS=900
 CACHE_DVSA_TTL_SECONDS=900
 CACHE_REPORT_TTL_SECONDS=300
+REPORT_CACHE_TTL_HOURS=24
+REPORT_CACHE_VERSION=v1
 
 ENABLE_LLM_REPORT_WRITER=false
+SUPABASE_URL=your_backend_supabase_url
+SUPABASE_SERVICE_ROLE_KEY=your_backend_service_role_key
 GEMINI_API_KEY=your_optional_gemini_key
-GEMINI_MODEL=gemini-1.5-flash
+GEMINI_MODEL=gemini-2.5-flash
 GEMINI_TIMEOUT_SECONDS=8
+AI_REPORT_VERSION=v1
 ```
 
-Secrets stay in the backend only. The frontend calls CarTruth's FastAPI backend and never calls DVLA or DVSA directly.
+Backend secrets stay in the backend only. Never expose `SUPABASE_SERVICE_ROLE_KEY` or `GEMINI_API_KEY` to the frontend. The frontend calls CarTruth's FastAPI backend and never calls DVLA, DVSA, Gemini, or backend Supabase cache tables directly.
 
 Set this value in `frontend/.env.local`:
 
@@ -175,6 +184,7 @@ The response includes:
 - `mileage_history`
 - `mot_intelligence`
 - `ownership_score`
+- `ai_report`, when optional Gemini insights are enabled and available
 - `data_source`
 - `confidence_level`
 - `trust_messages`
@@ -198,11 +208,13 @@ The report feedback card inserts rows into the existing Supabase `cartruth.feedb
 
 ## Caching
 
-The backend uses a small in-memory TTL cache for DVLA lookups, DVSA lookups, and final vehicle report responses. TTLs are configurable with `CACHE_DVLA_TTL_SECONDS`, `CACHE_DVSA_TTL_SECONDS`, and `CACHE_REPORT_TTL_SECONDS`; set `CACHE_ENABLED=false` to bypass the cache locally. The cache is intentionally simple and can be replaced later with Redis or another production cache if traffic requires it.
+The backend keeps the existing in-memory TTL cache for DVLA and DVSA lookups, then adds Supabase persistent caching for full vehicle reports. On a search, the backend checks `cartruth.vehicle_report_cache`; a fresh report within `REPORT_CACHE_TTL_HOURS` is returned immediately. If the report is stale or missing, the backend calls DVLA/DVSA, stores normalised source data in `cartruth.vehicle_source_cache`, calculates a deterministic SHA256 `source_hash`, and compares it with the previous source hash.
+
+If the source hash is unchanged, CarTruth reuses the cached rule-engine report and cached Gemini report without calling Gemini again. If the source hash changed, CarTruth reruns the rule engine, optionally calls Gemini once, and stores results in `cartruth.vehicle_report_cache` and `cartruth.ai_report_cache`. If Supabase is unavailable, the live DVLA/DVSA/report path still runs.
 
 ## Optional LLM Report Writer
 
-The rule engine remains the source of truth for score, verdict, risk level, MOT intelligence, running cost, and warnings. When `ENABLE_LLM_REPORT_WRITER=true` and `GEMINI_API_KEY` is configured, Gemini can rewrite the rule-based facts into a concise buyer-friendly summary. If Gemini is unavailable, CarTruth falls back to the existing rule-based summary.
+LLM wording is optional and is not enabled by default. The rule engine remains the source of truth for score, verdict, risk level, MOT intelligence, running cost, and warnings. When `ENABLE_LLM_REPORT_WRITER=true` and `GEMINI_API_KEY` is configured, Gemini rewrites structured CarTruth analysis into concise JSON insights for normal car buyers. If the Gemini key is missing, the API fails, or the response is invalid, CarTruth logs a safe fallback message and keeps the existing rule-based summary.
 
 ## Testing Notes
 
@@ -248,11 +260,16 @@ CACHE_ENABLED=true
 CACHE_DVLA_TTL_SECONDS=900
 CACHE_DVSA_TTL_SECONDS=900
 CACHE_REPORT_TTL_SECONDS=300
+REPORT_CACHE_TTL_HOURS=24
+REPORT_CACHE_VERSION=v1
 
 ENABLE_LLM_REPORT_WRITER=false
+SUPABASE_URL=...
+SUPABASE_SERVICE_ROLE_KEY=...
 GEMINI_API_KEY=...
-GEMINI_MODEL=gemini-1.5-flash
+GEMINI_MODEL=gemini-2.5-flash
 GEMINI_TIMEOUT_SECONDS=8
+AI_REPORT_VERSION=v1
 ```
 
 Render provides `PORT` automatically for web services. Keep the start command using `$PORT`.
@@ -319,6 +336,8 @@ Then open the Vercel frontend and search the same registration.
 - `ALLOW_MOCK_MOT_FALLBACK=false`, unless you intentionally want fallback data in production.
 - `FRONTEND_URL` points to the Vercel production URL.
 - `CORS_ALLOWED_ORIGINS` includes the Vercel production URL.
+- Render has `SUPABASE_URL` and backend-only `SUPABASE_SERVICE_ROLE_KEY` set for persistent report caching.
+- `GEMINI_API_KEY` is set only on the backend if optional AI insights are enabled.
 - Vercel has `NEXT_PUBLIC_API_BASE_URL` set to the Render backend URL.
 - Vercel has `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` set if feedback capture is enabled.
 - Playwright Chromium is installed in the backend deployment image for PDF generation.

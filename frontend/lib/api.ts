@@ -105,6 +105,16 @@ export interface OwnershipScore {
   analysis_notes: string[];
 }
 
+export interface AIReport {
+  headline: string;
+  summary: string;
+  buyVerdict: string;
+  topRisks: string[];
+  positiveSigns: string[];
+  ownershipAdvice: string;
+  confidenceNote: string;
+}
+
 export interface VehicleReport {
   vehicle: VehicleDetails;
   current_mot_status: string;
@@ -118,6 +128,7 @@ export interface VehicleReport {
   trust_messages: string[];
   unavailable_data: string[];
   warnings: string[];
+  ai_report?: AIReport | null;
 }
 
 export const searchVehicle = async (registration: string): Promise<VehicleReport> => {

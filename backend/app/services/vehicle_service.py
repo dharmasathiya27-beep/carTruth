@@ -1,15 +1,29 @@
 """Vehicle report orchestration service."""
 
+from __future__ import annotations
+
 import logging
 from typing import Optional
 
 from app.config import settings
-from app.models.schemas import MileageRecord, VehicleDetails, VehicleReport
+from app.models.mot_schema import NormalizedMOTRecord
+from app.models.schemas import AIReport, MileageRecord, VehicleDetails, VehicleReport
 from app.services import dvla_service, dvsa_service, mock_vehicle_service
-from app.services.gemini_report_writer import generate_llm_summary
-from app.services.lookup_cache import get_cached, set_cached
+from app.services.gemini_report_service import generate_gemini_ai_report
 from app.services.mot_analysis_service import enrich_mot_history, summarise_mot_risks
 from app.services.mot_data_normalizer import normalised_to_mot_record
+from app.services.source_hash_service import generate_source_hash, normalise_source_payload
+from app.services.supabase_cache_service import (
+    get_ai_report_cache,
+    get_latest_report_cache,
+    get_report_cache,
+    get_source_cache,
+    is_report_fresh,
+    update_last_checked_at,
+    upsert_ai_cache,
+    upsert_report_cache,
+    upsert_source_cache,
+)
 from app.services.vehicle_analysis_service import (
     calculate_ownership_score,
     get_current_mot_status,
@@ -117,14 +131,9 @@ def _enrich_vehicle_data_from_dvsa(vehicle_data: dict, vehicle_identity: dict) -
     return enriched
 
 
-async def generate_vehicle_report(registration: str) -> Optional[VehicleReport]:
-    """Generate a complete report with official API fallback to mock data."""
-    registration_clean = dvla_service.normalise_registration(registration)
-    report_cache_key = f"report:{registration_clean}"
-    cached_report = get_cached(report_cache_key)
-    if cached_report is not None:
-        return cached_report
-
+async def _fetch_source_data(
+    registration_clean: str,
+) -> Optional[tuple[dict, list[NormalizedMOTRecord], dict, str, list[str]]]:
     warnings: list[str] = []
     data_source = "dvla"
 
@@ -145,7 +154,6 @@ async def generate_vehicle_report(registration: str) -> Optional[VehicleReport]:
 
     dvsa_mot_data = await dvsa_service.fetch_vehicle_mot_data_from_dvsa(registration_clean)
     normalised_mot_history = dvsa_mot_data["mot_history"]
-    vehicle_data = _enrich_vehicle_data_from_dvsa(vehicle_data, dvsa_mot_data["vehicle_identity"])
 
     if not normalised_mot_history and not settings.use_mock_data:
         warnings.append(
@@ -162,6 +170,33 @@ async def generate_vehicle_report(registration: str) -> Optional[VehicleReport]:
                 )
                 warnings.append("Using development mock MOT history fallback.")
 
+    return (
+        vehicle_data,
+        normalised_mot_history,
+        dvsa_mot_data["vehicle_identity"],
+        data_source,
+        warnings,
+    )
+
+
+def _build_dvsa_source_payload(
+    normalised_mot_history: list[NormalizedMOTRecord],
+    vehicle_identity: dict,
+) -> dict:
+    return {
+        "mot_history": [record.model_dump(mode="json") for record in normalised_mot_history],
+        "vehicle_identity": vehicle_identity,
+    }
+
+
+def _build_report_from_source(
+    vehicle_data: dict,
+    normalised_mot_history: list[NormalizedMOTRecord],
+    vehicle_identity: dict,
+    data_source: str,
+    warnings: list[str],
+) -> VehicleReport:
+    vehicle_data = _enrich_vehicle_data_from_dvsa(vehicle_data, vehicle_identity)
     mot_history = [normalised_to_mot_record(record) for record in normalised_mot_history]
     mileage_history = _build_mileage_history_from_mot(normalised_mot_history)
 
@@ -181,15 +216,6 @@ async def generate_vehicle_report(registration: str) -> Optional[VehicleReport]:
         mot_valid_until = vehicle.mot_expiry_date
 
     ownership_score = calculate_ownership_score(vehicle, mot_history, mileage_history)
-    llm_summary = await generate_llm_summary(
-        vehicle=vehicle,
-        mot_history=mot_history,
-        mileage_history=mileage_history,
-        mot_intelligence=mot_intelligence,
-        ownership_score=ownership_score,
-    )
-    if llm_summary:
-        ownership_score.ai_summary = llm_summary
 
     if settings.use_mock_data and "mock" not in data_source:
         data_source = "mock"
@@ -216,8 +242,128 @@ async def generate_vehicle_report(registration: str) -> Optional[VehicleReport]:
         unavailable_data=unavailable_data,
         warnings=warnings,
     )
-    return set_cached(
-        report_cache_key,
-        report,
-        ttl_seconds=getattr(settings, "cache_report_ttl_seconds", 5 * 60),
+    return report
+
+
+def _report_from_cache(row: dict) -> Optional[VehicleReport]:
+    try:
+        report_json = row.get("report_json") or {}
+        return VehicleReport.model_validate(report_json)
+    except (TypeError, ValueError) as exc:
+        logger.warning("Cached report could not be parsed error_type=%s", type(exc).__name__)
+        return None
+
+
+def _ai_report_from_cache(row: dict | None) -> Optional[AIReport]:
+    if not row:
+        return None
+    try:
+        return AIReport.model_validate(row.get("ai_report_json") or {})
+    except (TypeError, ValueError) as exc:
+        logger.warning("Cached AI report could not be parsed error_type=%s", type(exc).__name__)
+        return None
+
+
+async def _attach_cached_ai_report(
+    report: VehicleReport, registration: str, source_hash: str
+) -> None:
+    cached_ai = _ai_report_from_cache(await get_ai_report_cache(registration, source_hash))
+    if cached_ai:
+        report.ai_report = cached_ai
+
+
+async def _cache_report_and_ai(
+    registration: str,
+    source_hash: str,
+    report: VehicleReport,
+    *,
+    should_call_gemini: bool,
+) -> None:
+    if should_call_gemini:
+        ai_report = await generate_gemini_ai_report(report)
+        if ai_report:
+            report.ai_report = ai_report
+            await upsert_ai_cache(
+                registration,
+                source_hash,
+                ai_report.model_dump(mode="json"),
+            )
+        else:
+            logger.info("Gemini fallback used for registration=%s", registration)
+    else:
+        logger.info("Gemini skipped for unchanged source registration=%s", registration)
+
+    await upsert_report_cache(
+        registration,
+        source_hash,
+        report.model_dump(mode="json"),
     )
+
+
+async def generate_vehicle_report(registration: str) -> Optional[VehicleReport]:
+    """Generate a complete report with persistent cache and live fallback."""
+    registration_clean = dvla_service.normalise_registration(registration)
+
+    latest_cached_report = await get_latest_report_cache(registration_clean)
+    if is_report_fresh(latest_cached_report):
+        report = _report_from_cache(latest_cached_report)
+        if report:
+            logger.info("Supabase report cache hit registration=%s", registration_clean)
+            return report
+
+    if latest_cached_report:
+        logger.info("Supabase report cache stale registration=%s", registration_clean)
+    else:
+        logger.info("Supabase report cache miss registration=%s", registration_clean)
+
+    source_result = await _fetch_source_data(registration_clean)
+    if not source_result:
+        return None
+
+    vehicle_data, normalised_mot_history, vehicle_identity, data_source, warnings = source_result
+    dvsa_source_data = _build_dvsa_source_payload(normalised_mot_history, vehicle_identity)
+    source_payload = normalise_source_payload(vehicle_data, dvsa_source_data)
+    source_hash = generate_source_hash(vehicle_data, dvsa_source_data)
+
+    previous_source = await get_source_cache(registration_clean)
+    source_unchanged = bool(previous_source and previous_source.get("source_hash") == source_hash)
+
+    if source_unchanged:
+        logger.info("Source hash unchanged registration=%s", registration_clean)
+        await update_last_checked_at(registration_clean)
+        cached_report = _report_from_cache(
+            await get_report_cache(registration_clean, source_hash) or {}
+        )
+        if cached_report:
+            await _attach_cached_ai_report(cached_report, registration_clean, source_hash)
+            return cached_report
+        logger.info(
+            "Source unchanged but cached rule report missing; rebuilding registration=%s",
+            registration_clean,
+        )
+    else:
+        logger.info("Source hash changed registration=%s", registration_clean)
+        await upsert_source_cache(
+            registration_clean,
+            source_hash,
+            source_payload["dvla"],
+            source_payload["dvsa"],
+        )
+
+    report = _build_report_from_source(
+        vehicle_data,
+        normalised_mot_history,
+        vehicle_identity,
+        data_source,
+        warnings,
+    )
+    if source_unchanged:
+        await _attach_cached_ai_report(report, registration_clean, source_hash)
+
+    await _cache_report_and_ai(
+        registration_clean,
+        source_hash,
+        report,
+        should_call_gemini=not source_unchanged,
+    )
+    return report

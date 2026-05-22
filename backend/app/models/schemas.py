@@ -99,6 +99,18 @@ class OwnershipScore(BaseModel):
     analysis_notes: List[str] = Field(default_factory=list)
 
 
+class AIReport(BaseModel):
+    """Optional public-friendly AI wording derived from CarTruth analysis"""
+
+    headline: str = ""
+    summary: str = ""
+    buyVerdict: str = ""
+    topRisks: List[str] = Field(default_factory=list)
+    positiveSigns: List[str] = Field(default_factory=list)
+    ownershipAdvice: str = ""
+    confidenceNote: str = ""
+
+
 class VehicleReport(BaseModel):
     """Complete vehicle report response"""
 
@@ -114,6 +126,7 @@ class VehicleReport(BaseModel):
     trust_messages: List[str] = Field(default_factory=list)
     unavailable_data: List[str] = Field(default_factory=list)
     warnings: List[str] = Field(default_factory=list)
+    ai_report: Optional[AIReport] = None
 
 
 class SearchQuery(BaseModel):
