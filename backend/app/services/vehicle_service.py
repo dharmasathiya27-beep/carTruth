@@ -11,6 +11,7 @@ from app.models.schemas import AIReport, MileageRecord, VehicleDetails, VehicleR
 from app.services import dvla_service, dvsa_service, mock_vehicle_service
 from app.services.gemini_report_service import (
     build_rule_based_ai_report,
+    cache_gemini_ai_report,
     generate_gemini_ai_report,
 )
 from app.services.mot_analysis_service import enrich_mot_history, summarise_mot_risks
@@ -322,6 +323,8 @@ async def _ensure_ai_report(
 
     logger.info("Gemini fallback used registration=%s gemini_status=FALLBACK", registration)
     report.ai_report = build_rule_based_ai_report(report)
+    cache_gemini_ai_report(report, report.ai_report)
+    logger.info("Fallback AI used registration=%s", registration)
     return "FALLBACK"
 
 
@@ -360,6 +363,40 @@ async def generate_vehicle_report(registration: str) -> Optional[VehicleReport]:
         data_source,
         warnings,
     )
+
+
+async def generate_vehicle_report_with_gemini(registration: str) -> Optional[VehicleReport]:
+    """Generate a live report, then attach optional Gemini AI insights."""
+    report = await generate_vehicle_report(registration)
+    if not report:
+        return None
+
+    logger.info(
+        "Gemini enabled=%s key_present=%s model=%s",
+        settings.enable_llm_report_writer,
+        bool(settings.gemini_api_key),
+        settings.gemini_model,
+    )
+
+    if not settings.enable_llm_report_writer:
+        logger.info("Gemini skipped because ENABLE_LLM_REPORT_WRITER is false")
+        return report
+    if not settings.gemini_api_key:
+        logger.info("Gemini skipped because GEMINI_API_KEY is missing")
+        report.ai_report = build_rule_based_ai_report(report)
+        logger.info("Fallback AI used registration=%s", report.vehicle.registration)
+        return report
+
+    ai_report = await generate_gemini_ai_report(report)
+    if ai_report:
+        report.ai_report = ai_report
+        logger.info("Gemini AI report attached to live report")
+        return report
+
+    logger.info("Gemini failed; fallback AI used registration=%s", report.vehicle.registration)
+    report.ai_report = build_rule_based_ai_report(report)
+    cache_gemini_ai_report(report, report.ai_report)
+    return report
 
 
 async def generate_vehicle_report_with_cache(registration: str) -> Optional[VehicleReport]:

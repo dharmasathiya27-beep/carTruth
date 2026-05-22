@@ -109,6 +109,7 @@ class AIReport(BaseModel):
     positiveSigns: List[str] = Field(default_factory=list)
     ownershipAdvice: str = ""
     confidenceNote: str = ""
+    source: str = "rule"
 
 
 class VehicleReport(BaseModel):

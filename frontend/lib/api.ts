@@ -113,6 +113,7 @@ export interface AIReport {
   positiveSigns: string[];
   ownershipAdvice: string;
   confidenceNote: string;
+  source?: 'gemini' | 'rule';
 }
 
 export interface VehicleReport {

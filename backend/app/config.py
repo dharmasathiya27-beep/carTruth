@@ -35,7 +35,7 @@ def _env_int(name: str, default: int) -> int:
 @dataclass(frozen=True)
 class Settings:
     dvla_api_key: str = os.getenv("DVLA_API_KEY", "")
-    app_env: str = os.getenv("APP_ENV", "development").strip().lower()
+    app_env: str = os.getenv("ENVIRONMENT", os.getenv("APP_ENV", "development")).strip().lower()
     frontend_url: str = os.getenv("FRONTEND_URL", "").strip().rstrip("/")
     cors_allowed_origins: list[str] = field(default_factory=list)
     use_mock_data: bool = _env_bool("USE_MOCK_DATA", True)
@@ -73,7 +73,9 @@ class Settings:
     )
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
     gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-    gemini_timeout_seconds: int = _env_int("GEMINI_TIMEOUT_SECONDS", 5)
+    gemini_fallback_model: str = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-2.5-flash-lite")
+    gemini_timeout_seconds: int = _env_int("GEMINI_TIMEOUT_SECONDS", 8)
+    enable_gemini_cache: bool = _env_bool("ENABLE_GEMINI_CACHE", True)
     ai_report_version: str = os.getenv("AI_REPORT_VERSION", "v1")
 
     @property

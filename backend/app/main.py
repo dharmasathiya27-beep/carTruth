@@ -5,7 +5,8 @@ Premium AI car intelligence service.
 
 from app.config import settings
 from app.routes import vehicle
-from fastapi import FastAPI
+from app.services.gemini_report_service import clear_gemini_ai_cache
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(
@@ -31,6 +32,15 @@ app.include_router(vehicle.router, prefix="/api/vehicle", tags=["vehicle"])
 async def health():
     """Top-level health endpoint for deployment checks."""
     return await vehicle.health_check()
+
+
+@app.post("/api/dev/clear-gemini-cache")
+async def clear_gemini_cache():
+    """Clear the development-only in-memory Gemini cache."""
+    if settings.app_env != "development":
+        raise HTTPException(status_code=404, detail="Not found")
+    cleared = clear_gemini_ai_cache()
+    return {"status": "ok", "cleared": cleared}
 
 
 @app.get("/")
