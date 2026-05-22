@@ -9,7 +9,10 @@ from app.config import settings
 from app.models.mot_schema import NormalizedMOTRecord
 from app.models.schemas import AIReport, MileageRecord, VehicleDetails, VehicleReport
 from app.services import dvla_service, dvsa_service, mock_vehicle_service
-from app.services.gemini_report_service import generate_gemini_ai_report
+from app.services.gemini_report_service import (
+    build_rule_based_ai_report,
+    generate_gemini_ai_report,
+)
 from app.services.mot_analysis_service import enrich_mot_history, summarise_mot_risks
 from app.services.mot_data_normalizer import normalised_to_mot_record
 from app.services.source_hash_service import generate_source_hash, normalise_source_payload
@@ -266,10 +269,60 @@ def _ai_report_from_cache(row: dict | None) -> Optional[AIReport]:
 
 async def _attach_cached_ai_report(
     report: VehicleReport, registration: str, source_hash: str
-) -> None:
+) -> bool:
     cached_ai = _ai_report_from_cache(await get_ai_report_cache(registration, source_hash))
     if cached_ai:
         report.ai_report = cached_ai
+        logger.info(
+            "Gemini skipped because cached AI exists registration=%s gemini_status=CACHED",
+            registration,
+        )
+        return True
+    return False
+
+
+async def _ensure_ai_report(
+    registration: str,
+    source_hash: str,
+    report: VehicleReport,
+    *,
+    allow_cached: bool,
+) -> str:
+    logger.info(
+        "Gemini readiness registration=%s enabled=%s key_present=%s",
+        registration,
+        settings.enable_llm_report_writer,
+        bool(settings.gemini_api_key),
+    )
+    if allow_cached and await _attach_cached_ai_report(report, registration, source_hash):
+        return "CACHED"
+
+    if not settings.enable_llm_report_writer:
+        logger.info(
+            "Gemini skipped because disabled registration=%s gemini_status=DISABLED", registration
+        )
+        return "DISABLED"
+    if not settings.gemini_api_key:
+        logger.info(
+            "Gemini skipped because key is missing registration=%s gemini_status=DISABLED",
+            registration,
+        )
+        return "DISABLED"
+
+    ai_report = await generate_gemini_ai_report(report)
+    if ai_report:
+        report.ai_report = ai_report
+        await upsert_ai_cache(
+            registration,
+            source_hash,
+            ai_report.model_dump(mode="json"),
+        )
+        logger.info("Gemini called registration=%s gemini_status=CALLED", registration)
+        return "CALLED"
+
+    logger.info("Gemini fallback used registration=%s gemini_status=FALLBACK", registration)
+    report.ai_report = build_rule_based_ai_report(report)
+    return "FALLBACK"
 
 
 async def _cache_report_and_ai(
@@ -277,22 +330,14 @@ async def _cache_report_and_ai(
     source_hash: str,
     report: VehicleReport,
     *,
-    should_call_gemini: bool,
+    allow_cached_ai: bool,
 ) -> None:
-    if should_call_gemini:
-        ai_report = await generate_gemini_ai_report(report)
-        if ai_report:
-            report.ai_report = ai_report
-            await upsert_ai_cache(
-                registration,
-                source_hash,
-                ai_report.model_dump(mode="json"),
-            )
-        else:
-            logger.info("Gemini fallback used for registration=%s", registration)
-    else:
-        logger.info("Gemini skipped for unchanged source registration=%s", registration)
-
+    await _ensure_ai_report(
+        registration,
+        source_hash,
+        report,
+        allow_cached=allow_cached_ai,
+    )
     await upsert_report_cache(
         registration,
         source_hash,
@@ -301,20 +346,51 @@ async def _cache_report_and_ai(
 
 
 async def generate_vehicle_report(registration: str) -> Optional[VehicleReport]:
-    """Generate a complete report with persistent cache and live fallback."""
+    """Generate a live report with DVLA/DVSA and the rule engine."""
+    registration_clean = dvla_service.normalise_registration(registration)
+    source_result = await _fetch_source_data(registration_clean)
+    if not source_result:
+        return None
+
+    vehicle_data, normalised_mot_history, vehicle_identity, data_source, warnings = source_result
+    return _build_report_from_source(
+        vehicle_data,
+        normalised_mot_history,
+        vehicle_identity,
+        data_source,
+        warnings,
+    )
+
+
+async def generate_vehicle_report_with_cache(registration: str) -> Optional[VehicleReport]:
+    """Generate a report using Supabase cache with live report fallback."""
     registration_clean = dvla_service.normalise_registration(registration)
 
     latest_cached_report = await get_latest_report_cache(registration_clean)
     if is_report_fresh(latest_cached_report):
         report = _report_from_cache(latest_cached_report)
         if report:
-            logger.info("Supabase report cache hit registration=%s", registration_clean)
+            logger.info(
+                "Supabase report cache hit registration=%s cache_status=HIT", registration_clean
+            )
+            source_hash = latest_cached_report.get("source_hash")
+            if source_hash:
+                await _ensure_ai_report(
+                    registration_clean,
+                    source_hash,
+                    report,
+                    allow_cached=True,
+                )
             return report
 
     if latest_cached_report:
-        logger.info("Supabase report cache stale registration=%s", registration_clean)
+        logger.info(
+            "Supabase report cache stale registration=%s cache_status=STALE", registration_clean
+        )
     else:
-        logger.info("Supabase report cache miss registration=%s", registration_clean)
+        logger.info(
+            "Supabase report cache miss registration=%s cache_status=MISS", registration_clean
+        )
 
     source_result = await _fetch_source_data(registration_clean)
     if not source_result:
@@ -335,7 +411,17 @@ async def generate_vehicle_report(registration: str) -> Optional[VehicleReport]:
             await get_report_cache(registration_clean, source_hash) or {}
         )
         if cached_report:
-            await _attach_cached_ai_report(cached_report, registration_clean, source_hash)
+            await _ensure_ai_report(
+                registration_clean,
+                source_hash,
+                cached_report,
+                allow_cached=True,
+            )
+            await upsert_report_cache(
+                registration_clean,
+                source_hash,
+                cached_report.model_dump(mode="json"),
+            )
             return cached_report
         logger.info(
             "Source unchanged but cached rule report missing; rebuilding registration=%s",
@@ -357,13 +443,10 @@ async def generate_vehicle_report(registration: str) -> Optional[VehicleReport]:
         data_source,
         warnings,
     )
-    if source_unchanged:
-        await _attach_cached_ai_report(report, registration_clean, source_hash)
-
     await _cache_report_and_ai(
         registration_clean,
         source_hash,
         report,
-        should_call_gemini=not source_unchanged,
+        allow_cached_ai=source_unchanged,
     )
     return report

@@ -125,11 +125,19 @@ def _normalise_ai_report(data: dict) -> AIReport:
 
 async def generate_gemini_ai_report(report: VehicleReport) -> Optional[AIReport]:
     """Call Gemini once for a structured AI report, or return None on fallback."""
+    logger.info(
+        "Gemini config enabled=%s key_present=%s model=%s version=%s timeout=%s",
+        settings.enable_llm_report_writer,
+        bool(settings.gemini_api_key),
+        settings.gemini_model,
+        settings.ai_report_version,
+        settings.gemini_timeout_seconds,
+    )
     if not settings.enable_llm_report_writer:
-        logger.info("Gemini skipped because ENABLE_LLM_REPORT_WRITER is false")
+        logger.info("Gemini skipped because disabled")
         return None
     if not settings.gemini_api_key:
-        logger.info("Gemini skipped because GEMINI_API_KEY is missing")
+        logger.info("Gemini skipped because key is missing")
         return None
 
     logger.info("Gemini called for registration=%s", report.vehicle.registration)
@@ -156,22 +164,30 @@ async def generate_gemini_ai_report(report: VehicleReport) -> Optional[AIReport]
                 json=payload,
             ) as response:
                 if response.status >= 400:
-                    logger.warning("Gemini fallback used status=%s", response.status)
+                    body = await response.text()
+                    logger.warning(
+                        "Gemini failed with status=%s body=%s gemini_status=FAILED",
+                        response.status,
+                        body[:1200],
+                    )
                     return None
                 data = await response.json()
     except (aiohttp.ClientError, TimeoutError, ValueError) as exc:
-        logger.warning("Gemini fallback used error_type=%s", type(exc).__name__)
+        logger.warning(
+            "Gemini failed error_type=%s gemini_status=FAILED",
+            type(exc).__name__,
+        )
         return None
 
     try:
         text = data["candidates"][0]["content"]["parts"][0]["text"]
     except (KeyError, IndexError, TypeError):
-        logger.warning("Gemini fallback used because response text was missing")
+        logger.warning("Gemini failed because response text was missing gemini_status=FAILED")
         return None
 
     parsed = _extract_json(text)
     if not parsed:
-        logger.warning("Gemini fallback used because JSON parsing failed")
+        logger.warning("Gemini failed because JSON parsing failed gemini_status=FAILED")
         return None
 
     return _normalise_ai_report(parsed)

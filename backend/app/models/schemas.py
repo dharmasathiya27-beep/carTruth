@@ -104,7 +104,7 @@ class AIReport(BaseModel):
 
     headline: str = ""
     summary: str = ""
-    buyVerdict: str = ""
+    buyVerdict: str = "Inspect Carefully"
     topRisks: List[str] = Field(default_factory=list)
     positiveSigns: List[str] = Field(default_factory=list)
     ownershipAdvice: str = ""

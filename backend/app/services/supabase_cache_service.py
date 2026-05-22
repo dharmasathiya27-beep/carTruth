@@ -82,11 +82,13 @@ async def _request(
                 json=json,
             ) as response:
                 if response.status >= 400:
+                    body = await response.text()
                     logger.warning(
-                        "Supabase cache %s failed table=%s status=%s",
+                        "Supabase cache request failed method=%s table=%s status=%s body=%s",
                         method,
                         table,
                         response.status,
+                        body[:1200],
                     )
                     return None
                 if response.status == 204:
@@ -180,7 +182,10 @@ async def upsert_source_cache(
             "updated_at": checked_at,
         },
     )
-    return data is not None
+    saved = data is not None
+    if saved:
+        logger.info("Source cache updated registration=%s", registration)
+    return saved
 
 
 async def update_last_checked_at(registration: str) -> bool:
@@ -188,7 +193,10 @@ async def update_last_checked_at(registration: str) -> bool:
         "PATCH",
         "vehicle_source_cache",
         params={"registration": f"eq.{registration}"},
-        json={"last_checked_at": datetime.now(timezone.utc).isoformat()},
+        json={
+            "last_checked_at": datetime.now(timezone.utc).isoformat(),
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        },
     )
     return data is not None
 
@@ -202,7 +210,7 @@ async def upsert_report_cache(
     data = await _request(
         "POST",
         "vehicle_report_cache",
-        params={"on_conflict": "registration,source_hash,report_version"},
+        params={"on_conflict": "registration"},
         json={
             "registration": registration,
             "source_hash": source_hash,
@@ -211,7 +219,10 @@ async def upsert_report_cache(
             "updated_at": updated_at,
         },
     )
-    return data is not None
+    saved = data is not None
+    if saved:
+        logger.info("Report cache updated registration=%s", registration)
+    return saved
 
 
 async def upsert_ai_cache(
@@ -223,7 +234,7 @@ async def upsert_ai_cache(
     data = await _request(
         "POST",
         "ai_report_cache",
-        params={"on_conflict": "registration,source_hash,ai_model,ai_report_version"},
+        params={"on_conflict": "registration"},
         json={
             "registration": registration,
             "source_hash": source_hash,
@@ -233,4 +244,7 @@ async def upsert_ai_cache(
             "updated_at": updated_at,
         },
     )
-    return data is not None
+    saved = data is not None
+    if saved:
+        logger.info("Gemini saved to ai_report_cache registration=%s", registration)
+    return saved

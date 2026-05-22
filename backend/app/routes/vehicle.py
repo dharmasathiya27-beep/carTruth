@@ -6,7 +6,7 @@ from app.config import settings
 from app.models.schemas import SearchQuery, VehicleReport
 from app.services.dvla_service import is_valid_registration_format, normalise_registration
 from app.services.pdf_service import generate_vehicle_pdf
-from app.services.vehicle_service import generate_vehicle_report
+from app.services.vehicle_service import generate_vehicle_report, generate_vehicle_report_with_cache
 from fastapi import APIRouter, HTTPException, Response
 
 router = APIRouter()
@@ -26,7 +26,7 @@ async def search_vehicle(query: SearchQuery):
         )
 
     registration = normalise_registration(query.registration)
-    report = await generate_vehicle_report(registration)
+    report = await generate_vehicle_report_with_cache(registration)
 
     if not report:
         raise HTTPException(

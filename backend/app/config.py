@@ -67,10 +67,13 @@ class Settings:
     report_cache_version: str = os.getenv("REPORT_CACHE_VERSION", "v1")
     enable_llm_report_writer: bool = _env_bool("ENABLE_LLM_REPORT_WRITER", False)
     supabase_url: str = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
-    supabase_service_role_key: str = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+    supabase_service_role_key: str = os.getenv(
+        "SUPABASE_SERVICE_ROLE_KEY",
+        os.getenv("SUPABASE_KEY", ""),
+    )
     gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
     gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
-    gemini_timeout_seconds: int = _env_int("GEMINI_TIMEOUT_SECONDS", 8)
+    gemini_timeout_seconds: int = _env_int("GEMINI_TIMEOUT_SECONDS", 5)
     ai_report_version: str = os.getenv("AI_REPORT_VERSION", "v1")
 
     @property
