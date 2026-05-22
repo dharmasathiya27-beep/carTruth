@@ -3,6 +3,7 @@
 import { AlertCircle, CheckCircle2, MessageSquare, Send } from 'lucide-react';
 import { useState } from 'react';
 import { VehicleReport } from '@/lib/api';
+import { getSupabaseConfigStatus, hasSupabaseConfig, supabase } from '@/lib/supabase';
 
 interface ReportFeedbackCardProps {
   report: VehicleReport;
@@ -18,39 +19,104 @@ const ISSUE_OPTIONS = [
 
 const USEFULNESS_OPTIONS = ['Yes', 'Somewhat', 'No'];
 
+function feedbackErrorMessage(error: unknown) {
+  const supabaseError = error as { code?: string; message?: string } | null;
+  const message = supabaseError?.message || '';
+
+  if (error instanceof Error && error.message.includes('environment variables')) {
+    return 'Feedback is not configured yet. Please check the Supabase environment variables.';
+  }
+
+  if (supabaseError?.code === 'PGRST106' || message.includes('Invalid schema')) {
+    return 'Feedback database schema is not exposed to the Supabase API yet.';
+  }
+
+  if (message.toLowerCase().includes('row-level security')) {
+    return 'Feedback could not be submitted because Supabase permissions need updating.';
+  }
+
+  return 'Feedback could not be submitted. Please try again in a moment.';
+}
+
 export default function ReportFeedbackCard({ report }: ReportFeedbackCardProps) {
   const [usefulness, setUsefulness] = useState('');
   const [issueType, setIssueType] = useState('');
   const [details, setDetails] = useState('');
+  const [websiteFeedback, setWebsiteFeedback] = useState('');
   const [status, setStatus] = useState('');
+  const [statusType, setStatusType] = useState<'success' | 'error' | ''>('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const saveFeedback = () => {
-    const feedback = {
-      id: crypto.randomUUID(),
-      createdAt: new Date().toISOString(),
-      registration: report.vehicle.registration,
-      make: report.vehicle.make,
-      model: report.vehicle.model,
-      usefulness,
-      issueType,
-      details: details.trim(),
-      score: report.ownership_score.score,
-      verdict: report.ownership_score.verdict,
-      confidence: report.confidence_level,
-    };
+  const saveFeedback = async () => {
+    if (!canSubmit || isSubmitting) return;
 
-    const existing = JSON.parse(localStorage.getItem('cartruth.feedback') || '[]');
-    localStorage.setItem('cartruth.feedback', JSON.stringify([feedback, ...existing].slice(0, 50)));
+    setIsSubmitting(true);
+    setStatus('');
+    setStatusType('');
 
-    if (process.env.NODE_ENV === 'development') {
-      console.info('CarTruth MVP feedback', feedback);
+    try {
+      const configStatus = getSupabaseConfigStatus();
+      console.info('CarTruth feedback: preparing Supabase insert', {
+        configStatus,
+        target: 'cartruth.feedback',
+        insertPath: "supabase.schema('cartruth').from('feedback').insert(...)",
+      });
+
+      if (!supabase || !hasSupabaseConfig()) {
+        throw new Error('Supabase environment variables are not configured.');
+      }
+
+      // Insert into the existing Supabase table: schema "cartruth", table "feedback".
+      // Field names are snake_case to match the table exactly.
+      const feedback = {
+        registration: report.vehicle.registration,
+        make: report.vehicle.make,
+        model: report.vehicle.model,
+        usefulness,
+        issue_type: issueType,
+        details: details.trim(),
+        website_feedback: websiteFeedback.trim(),
+        ownership_score: report.ownership_score.score,
+        verdict: report.ownership_score.verdict,
+        confidence: report.confidence_level,
+        user_agent: typeof navigator !== 'undefined' ? navigator.userAgent : '',
+        page_url: typeof window !== 'undefined' ? window.location.href : '',
+      };
+
+      console.info('CarTruth feedback: insert payload', feedback);
+
+      const { data, error, status, statusText } = await supabase
+        .schema('cartruth')
+        .from('feedback')
+        .insert(feedback);
+
+      console.info('CarTruth feedback: Supabase insert response', {
+        data,
+        error,
+        status,
+        statusText,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      setUsefulness('');
+      setIssueType('');
+      setDetails('');
+      setWebsiteFeedback('');
+      setStatusType('success');
+      setStatus('Thank you for helping improve CarTruth.');
+    } catch (error) {
+      console.error('CarTruth feedback: Supabase insert failed', error);
+      setStatusType('error');
+      setStatus(feedbackErrorMessage(error));
+    } finally {
+      setIsSubmitting(false);
     }
-
-    setStatus('Thanks. Feedback saved locally for MVP testing.');
-    setDetails('');
   };
 
-  const canSubmit = usefulness || issueType || details.trim();
+  const canSubmit = usefulness || issueType || details.trim() || websiteFeedback.trim();
 
   return (
     <section className="glass rounded-2xl p-6 no-print">
@@ -65,7 +131,13 @@ export default function ReportFeedbackCard({ report }: ReportFeedbackCardProps) 
           </p>
         </div>
         {status && (
-          <span className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
+          <span
+            className={`inline-flex items-center gap-2 rounded-lg border px-3 py-2 text-sm ${
+              statusType === 'error'
+                ? 'border-red-500/25 bg-red-500/10 text-red-200'
+                : 'border-emerald-500/25 bg-emerald-500/10 text-emerald-200'
+            }`}
+          >
             <CheckCircle2 className="h-4 w-4" />
             {status}
           </span>
@@ -126,6 +198,17 @@ export default function ReportFeedbackCard({ report }: ReportFeedbackCardProps) 
           />
         </label>
 
+        <label className="block">
+          <span className="mb-2 block text-sm font-semibold text-white">Website feedback</span>
+          <textarea
+            value={websiteFeedback}
+            onChange={(event) => setWebsiteFeedback(event.target.value)}
+            rows={3}
+            placeholder="Optional thoughts about the page, layout, or experience"
+            className="w-full resize-none rounded-xl border border-white/10 bg-slate-950/50 p-3 text-sm text-white placeholder:text-slate-500 focus:border-cyan-400/50 focus:outline-none"
+          />
+        </label>
+
         <div className="flex flex-wrap items-center justify-between gap-4">
           <p className="flex max-w-2xl items-start gap-2 text-xs leading-relaxed text-slate-500">
             <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-slate-400" />
@@ -134,12 +217,12 @@ export default function ReportFeedbackCard({ report }: ReportFeedbackCardProps) 
           </p>
           <button
             type="button"
-            disabled={!canSubmit}
+            disabled={!canSubmit || isSubmitting}
             onClick={saveFeedback}
             className="inline-flex items-center gap-2 rounded-lg border border-cyan-400/30 bg-cyan-500/15 px-5 py-3 text-sm font-semibold text-cyan-100 transition-all hover:bg-cyan-500/25 disabled:cursor-not-allowed disabled:opacity-40"
           >
             <Send className="h-4 w-4" />
-            Save feedback
+            {isSubmitting ? 'Submitting...' : 'Save feedback'}
           </button>
         </div>
       </div>

@@ -6,34 +6,158 @@ import { VehicleReport } from '@/lib/api';
 
 interface ShareReportCardProps {
   report: VehicleReport;
+  pdfTargetId: string;
 }
 
-export default function ShareReportCard({ report }: ShareReportCardProps) {
+const PDF_TIMEOUT_MS = 30000;
+
+function withTimeout<T>(work: Promise<T>, timeoutMessage: string): Promise<T> {
+  return Promise.race([
+    work,
+    new Promise<T>((_, reject) => {
+      window.setTimeout(() => reject(new Error(timeoutMessage)), PDF_TIMEOUT_MS);
+    }),
+  ]);
+}
+
+export default function ShareReportCard({ report, pdfTargetId }: ShareReportCardProps) {
   const [status, setStatus] = useState('');
-
-  const summary = useMemo(() => {
-    const vehicle = report.vehicle;
-    return [
-      `CarTruth report: ${vehicle.registration} - ${vehicle.make} ${vehicle.model}`.trim(),
-      `Ownership score: ${report.ownership_score.score}/100`,
-      `Risk level: ${report.ownership_score.risk_level}`,
-      `Verdict: ${report.ownership_score.verdict}`,
-      `Confidence: ${report.confidence_level}`,
-    ].join('\n');
-  }, [report]);
-
-  const copyText = async (text: string, success: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      setStatus(success);
-    } catch {
-      setStatus('Copy failed. Select and copy from the address bar instead.');
-    }
-  };
+  const [statusType, setStatusType] = useState<'success' | 'error' | ''>('');
+  const [copyingAction, setCopyingAction] = useState<'link' | 'summary' | ''>('');
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   const currentUrl = () => {
     if (typeof window === 'undefined') return '';
     return window.location.href;
+  };
+
+  const summary = useMemo(() => {
+    const vehicle = report.vehicle;
+    return [
+      `CarTruth report: ${vehicle.registration}`,
+      `Vehicle: ${[vehicle.make, vehicle.model, vehicle.year].filter(Boolean).join(' ')}`,
+      `Ownership score: ${report.ownership_score.score}/100`,
+      `Verdict: ${report.ownership_score.verdict}`,
+      `MOT status: ${report.current_mot_status || 'Unknown'}`,
+      `Main risk summary: ${report.ownership_score.ai_summary || report.ownership_score.score_explanation}`,
+      `Link: ${currentUrl()}`,
+    ].join('\n');
+  }, [report]);
+
+  const showStatus = (message: string, type: 'success' | 'error' = 'success') => {
+    setStatus(message);
+    setStatusType(type);
+  };
+
+  const copyText = async (text: string, success: string, action: 'link' | 'summary') => {
+    setCopyingAction(action);
+    setStatus('');
+    setStatusType('');
+
+    try {
+      if (!navigator.clipboard?.writeText) {
+        throw new Error('Clipboard API unavailable');
+      }
+      await navigator.clipboard.writeText(text);
+      showStatus(success);
+    } catch (error) {
+      console.error('CarTruth share copy failed', error);
+      showStatus('Unable to copy', 'error');
+    } finally {
+      setCopyingAction('');
+    }
+  };
+
+  const printReport = () => {
+    window.print();
+  };
+
+  const fileSafeRegistration = (report.vehicle.registration || 'report').replace(
+    /[^a-z0-9-]/gi,
+    '',
+  );
+
+  const downloadPdf = async () => {
+    setIsGeneratingPdf(true);
+    setStatus('');
+    setStatusType('');
+    let timerStarted = false;
+
+    try {
+      console.time('pdf-generation');
+      timerStarted = true;
+
+      const target = document.getElementById(pdfTargetId);
+      if (!target) {
+        showStatus('Unable to generate PDF right now. Please try Print report instead.', 'error');
+        return;
+      }
+
+      const [{ default: html2canvas }, { default: jsPDF }] = await Promise.all([
+        import('html2canvas'),
+        import('jspdf'),
+      ]);
+
+      const canvas = await withTimeout(
+        html2canvas(target, {
+          scale: 1.5,
+          useCORS: true,
+          backgroundColor: '#ffffff',
+          logging: false,
+          ignoreElements: (element) => {
+            const computed = window.getComputedStyle(element);
+            return (
+              element.classList.contains('no-print') ||
+              computed.display === 'none' ||
+              computed.visibility === 'hidden'
+            );
+          },
+          onclone: (clonedDocument) => {
+            const clonedTarget = clonedDocument.getElementById(pdfTargetId);
+            if (clonedTarget) {
+              clonedTarget.style.background = '#ffffff';
+              clonedTarget.style.color = '#111827';
+              clonedTarget.querySelectorAll<HTMLElement>('*').forEach((element) => {
+                element.style.animation = 'none';
+                element.style.transition = 'none';
+              });
+            }
+          },
+        }),
+        'PDF capture timed out.',
+      );
+
+      const imageData = canvas.toDataURL('image/jpeg', 0.85);
+      const pdf = new jsPDF('p', 'mm', 'a4');
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+      const imageWidth = pageWidth;
+      const imageHeight = (canvas.height * imageWidth) / canvas.width;
+
+      let remainingHeight = imageHeight;
+      let yPosition = 0;
+
+      pdf.addImage(imageData, 'JPEG', 0, yPosition, imageWidth, imageHeight);
+      remainingHeight -= pageHeight;
+
+      while (remainingHeight > 0) {
+        yPosition -= pageHeight;
+        pdf.addPage();
+        pdf.addImage(imageData, 'JPEG', 0, yPosition, imageWidth, imageHeight);
+        remainingHeight -= pageHeight;
+      }
+
+      pdf.save(`CarTruth-${fileSafeRegistration || 'report'}.pdf`);
+      showStatus('PDF downloaded');
+    } catch (error) {
+      console.error('CarTruth PDF generation failed', error);
+      showStatus('Unable to generate PDF right now. Please try Print report instead.', 'error');
+    } finally {
+      if (timerStarted) {
+        console.timeEnd('pdf-generation');
+      }
+      setIsGeneratingPdf(false);
+    }
   };
 
   return (
@@ -45,11 +169,18 @@ export default function ShareReportCard({ report }: ShareReportCardProps) {
             <h2 className="text-xl font-semibold">Share Report</h2>
           </div>
           <p className="text-sm text-slate-400">
-            Share this report, print it, or prepare a PDF using your browser print dialog.
+            Share this report, print it, or download a PDF copy.
           </p>
         </div>
         {status && (
-          <span className="rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-200">
+          <span
+            role="status"
+            className={`rounded-lg border px-3 py-2 text-sm ${
+              statusType === 'error'
+                ? 'border-red-500/25 bg-red-500/10 text-red-200'
+                : 'border-emerald-500/25 bg-emerald-500/10 text-emerald-200'
+            }`}
+          >
             {status}
           </span>
         )}
@@ -57,15 +188,20 @@ export default function ShareReportCard({ report }: ShareReportCardProps) {
 
       <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <button
-          onClick={() => copyText(currentUrl(), 'Report link copied')}
+          type="button"
+          aria-label="Copy current report link"
+          disabled={Boolean(copyingAction)}
+          onClick={() => copyText(currentUrl(), 'Report link copied', 'link')}
           className="flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-slate-900/60 px-4 py-3 text-sm font-semibold text-slate-100 hover:bg-slate-800"
         >
           <Copy className="w-4 h-4" />
-          Copy report link
+          {copyingAction === 'link' ? 'Copying...' : 'Copy report link'}
         </button>
 
         <button
-          onClick={() => window.print()}
+          type="button"
+          aria-label="Print report"
+          onClick={printReport}
           className="flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-slate-900/60 px-4 py-3 text-sm font-semibold text-slate-100 hover:bg-slate-800"
         >
           <Printer className="w-4 h-4" />
@@ -73,24 +209,32 @@ export default function ShareReportCard({ report }: ShareReportCardProps) {
         </button>
 
         <button
-          onClick={() => {
-            setStatus('Use Print report, then choose Save as PDF.');
-            window.print();
-          }}
+          type="button"
+          aria-label="Download report as PDF"
+          disabled={isGeneratingPdf}
+          onClick={downloadPdf}
           className="flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-slate-900/60 px-4 py-3 text-sm font-semibold text-slate-100 hover:bg-slate-800"
         >
           <Download className="w-4 h-4" />
-          PDF placeholder
+          {isGeneratingPdf ? 'Preparing lightweight PDF...' : 'Download PDF'}
         </button>
 
         <button
-          onClick={() => copyText(summary, 'Summary copied')}
+          type="button"
+          aria-label="Copy report summary text"
+          disabled={Boolean(copyingAction)}
+          onClick={() => copyText(summary, 'Summary copied', 'summary')}
           className="flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-slate-900/60 px-4 py-3 text-sm font-semibold text-slate-100 hover:bg-slate-800"
         >
           <FileText className="w-4 h-4" />
-          Share summary text
+          {copyingAction === 'summary' ? 'Copying...' : 'Share summary text'}
         </button>
       </div>
+
+      <p className="mt-3 text-xs text-slate-500">
+        PDF includes the vehicle summary, ownership score, MOT intelligence, mileage trend,
+        confidence notes, and disclaimer.
+      </p>
     </section>
   );
 }
