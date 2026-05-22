@@ -152,6 +152,24 @@ export const searchVehicle = async (registration: string): Promise<VehicleReport
   }
 };
 
+export const downloadVehiclePdf = async (registration: string): Promise<Blob> => {
+  try {
+    const cleaned = cleanRegistration(registration);
+    const response = await apiClient.get(`/api/vehicle/${encodeURIComponent(cleaned)}/pdf`, {
+      responseType: 'blob',
+      headers: {
+        Accept: 'application/pdf',
+      },
+    });
+    return response.data;
+  } catch (error: any) {
+    if (!error.response) {
+      throw new Error('CarTruth backend is not reachable. Please try Print report instead.');
+    }
+    throw new Error('Unable to generate PDF right now. Please try Print report instead.');
+  }
+};
+
 export const healthCheck = async (): Promise<boolean> => {
   try {
     await apiClient.get('/health');

@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 import { Copy, Download, FileText, Printer, Share2 } from 'lucide-react';
-import { VehicleReport } from '@/lib/api';
+import { downloadVehiclePdf, VehicleReport } from '@/lib/api';
 
 interface ShareReportCardProps {
   report: VehicleReport;
@@ -86,7 +86,34 @@ export default function ShareReportCard({ report, pdfTargetId }: ShareReportCard
     try {
       console.time('pdf-generation');
       timerStarted = true;
+      const pdfBlob = await downloadVehiclePdf(report.vehicle.registration);
+      const objectUrl = URL.createObjectURL(pdfBlob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = `CarTruth-${fileSafeRegistration || 'report'}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+      showStatus('PDF downloaded');
+    } catch (error) {
+      console.error('CarTruth backend PDF generation failed, trying browser fallback', error);
+      try {
+        await downloadPdfFallback();
+      } catch (fallbackError) {
+        console.error('CarTruth PDF fallback failed', fallbackError);
+        showStatus('Unable to generate PDF right now. Please try Print report instead.', 'error');
+      }
+    } finally {
+      if (timerStarted) {
+        console.timeEnd('pdf-generation');
+      }
+      setIsGeneratingPdf(false);
+    }
+  };
 
+  const downloadPdfFallback = async () => {
+    try {
       const target = document.getElementById(pdfTargetId);
       if (!target) {
         showStatus('Unable to generate PDF right now. Please try Print report instead.', 'error');
@@ -152,11 +179,7 @@ export default function ShareReportCard({ report, pdfTargetId }: ShareReportCard
     } catch (error) {
       console.error('CarTruth PDF generation failed', error);
       showStatus('Unable to generate PDF right now. Please try Print report instead.', 'error');
-    } finally {
-      if (timerStarted) {
-        console.timeEnd('pdf-generation');
-      }
-      setIsGeneratingPdf(false);
+      throw error;
     }
   };
 
@@ -216,7 +239,7 @@ export default function ShareReportCard({ report, pdfTargetId }: ShareReportCard
           className="flex items-center justify-center gap-2 rounded-lg border border-white/10 bg-slate-900/60 px-4 py-3 text-sm font-semibold text-slate-100 hover:bg-slate-800"
         >
           <Download className="w-4 h-4" />
-          {isGeneratingPdf ? 'Preparing lightweight PDF...' : 'Download PDF'}
+          {isGeneratingPdf ? 'Preparing your CarTruth report...' : 'Download PDF'}
         </button>
 
         <button

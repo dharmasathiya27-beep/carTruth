@@ -5,8 +5,9 @@ API Routes for CarTruth vehicle service.
 from app.config import settings
 from app.models.schemas import SearchQuery, VehicleReport
 from app.services.dvla_service import is_valid_registration_format, normalise_registration
+from app.services.pdf_service import generate_vehicle_pdf
 from app.services.vehicle_service import generate_vehicle_report
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Response
 
 router = APIRouter()
 
@@ -37,6 +38,40 @@ async def search_vehicle(query: SearchQuery):
         )
 
     return report
+
+
+@router.get("/{registration}/pdf")
+async def download_vehicle_pdf(registration: str):
+    """Generate a downloadable premium PDF report for a vehicle."""
+    if not registration or not is_valid_registration_format(registration):
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid registration number. Use only letters, numbers, and spaces.",
+        )
+
+    registration_clean = normalise_registration(registration)
+    report = await generate_vehicle_report(registration_clean)
+
+    if not report:
+        raise HTTPException(
+            status_code=404,
+            detail=(
+                f"Vehicle with registration '{registration_clean}' was not found. "
+                "Check the registration and try again."
+            ),
+        )
+
+    try:
+        pdf_bytes = await generate_vehicle_pdf(report)
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+
+    filename = f"CarTruth-{registration_clean}.pdf"
+    return Response(
+        content=pdf_bytes,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/health")
