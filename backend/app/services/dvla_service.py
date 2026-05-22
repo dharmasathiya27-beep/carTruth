@@ -121,7 +121,9 @@ async def fetch_vehicle_from_dvla(registration: str) -> Optional[dict]:
                     )
                     return None
                 return set_cached(
-                    cache_key, _normalise_vehicle_payload(registration_clean, payload)
+                    cache_key,
+                    _normalise_vehicle_payload(registration_clean, payload),
+                    ttl_seconds=settings.cache_dvla_ttl_seconds,
                 )
     except (aiohttp.ClientError, TimeoutError, ValueError) as exc:
         logger.warning(

@@ -6,6 +6,8 @@ from typing import Optional
 from app.config import settings
 from app.models.schemas import MileageRecord, VehicleDetails, VehicleReport
 from app.services import dvla_service, dvsa_service, mock_vehicle_service
+from app.services.gemini_report_writer import generate_llm_summary
+from app.services.lookup_cache import get_cached, set_cached
 from app.services.mot_analysis_service import enrich_mot_history, summarise_mot_risks
 from app.services.mot_data_normalizer import normalised_to_mot_record
 from app.services.vehicle_analysis_service import (
@@ -118,6 +120,11 @@ def _enrich_vehicle_data_from_dvsa(vehicle_data: dict, vehicle_identity: dict) -
 async def generate_vehicle_report(registration: str) -> Optional[VehicleReport]:
     """Generate a complete report with official API fallback to mock data."""
     registration_clean = dvla_service.normalise_registration(registration)
+    report_cache_key = f"report:{registration_clean}"
+    cached_report = get_cached(report_cache_key)
+    if cached_report is not None:
+        return cached_report
+
     warnings: list[str] = []
     data_source = "dvla"
 
@@ -174,6 +181,15 @@ async def generate_vehicle_report(registration: str) -> Optional[VehicleReport]:
         mot_valid_until = vehicle.mot_expiry_date
 
     ownership_score = calculate_ownership_score(vehicle, mot_history, mileage_history)
+    llm_summary = await generate_llm_summary(
+        vehicle=vehicle,
+        mot_history=mot_history,
+        mileage_history=mileage_history,
+        mot_intelligence=mot_intelligence,
+        ownership_score=ownership_score,
+    )
+    if llm_summary:
+        ownership_score.ai_summary = llm_summary
 
     if settings.use_mock_data and "mock" not in data_source:
         data_source = "mock"
@@ -186,7 +202,7 @@ async def generate_vehicle_report(registration: str) -> Optional[VehicleReport]:
         warnings=warnings,
     )
 
-    return VehicleReport(
+    report = VehicleReport(
         vehicle=vehicle,
         current_mot_status=current_mot_status,
         mot_valid_until=mot_valid_until,
@@ -199,4 +215,9 @@ async def generate_vehicle_report(registration: str) -> Optional[VehicleReport]:
         trust_messages=trust_messages,
         unavailable_data=unavailable_data,
         warnings=warnings,
+    )
+    return set_cached(
+        report_cache_key,
+        report,
+        ttl_seconds=getattr(settings, "cache_report_ttl_seconds", 5 * 60),
     )

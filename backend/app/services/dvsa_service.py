@@ -108,6 +108,7 @@ async def fetch_vehicle_mot_data_from_dvsa(registration: str) -> dict:
                         "mot_history": normalise_dvsa_mot_response(payload),
                         "vehicle_identity": _normalise_vehicle_identity(payload),
                     },
+                    ttl_seconds=settings.cache_dvsa_ttl_seconds,
                 )
     except (aiohttp.ClientError, TimeoutError, ValueError) as exc:
         logger.warning(

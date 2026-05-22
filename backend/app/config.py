@@ -22,6 +22,16 @@ def _env_list(name: str) -> list[str]:
     return [item.strip().rstrip("/") for item in value.split(",") if item.strip()]
 
 
+def _env_int(name: str, default: int) -> int:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        return default
+
+
 @dataclass(frozen=True)
 class Settings:
     dvla_api_key: str = os.getenv("DVLA_API_KEY", "")
@@ -37,7 +47,7 @@ class Settings:
         "DVLA_API_BASE_URL",
         "https://driver-vehicle-licensing.api.gov.uk/vehicle-enquiry/v1/vehicles",
     )
-    dvla_timeout_seconds: int = int(os.getenv("DVLA_TIMEOUT_SECONDS", "8"))
+    dvla_timeout_seconds: int = _env_int("DVLA_TIMEOUT_SECONDS", 8)
     dvsa_client_id: str = os.getenv("DVSA_CLIENT_ID", "")
     dvsa_client_secret: str = os.getenv("DVSA_CLIENT_SECRET", "")
     dvsa_api_key: str = os.getenv("DVSA_API_KEY", "")
@@ -47,8 +57,16 @@ class Settings:
         "DVSA_API_BASE_URL",
         "https://history.mot.api.gov.uk/v1/trade/vehicles/registration",
     )
-    dvsa_token_timeout_seconds: int = int(os.getenv("DVSA_TOKEN_TIMEOUT_SECONDS", "10"))
-    dvsa_timeout_seconds: int = int(os.getenv("DVSA_TIMEOUT_SECONDS", "10"))
+    dvsa_token_timeout_seconds: int = _env_int("DVSA_TOKEN_TIMEOUT_SECONDS", 10)
+    dvsa_timeout_seconds: int = _env_int("DVSA_TIMEOUT_SECONDS", 10)
+    cache_enabled: bool = _env_bool("CACHE_ENABLED", True)
+    cache_dvla_ttl_seconds: int = _env_int("CACHE_DVLA_TTL_SECONDS", 15 * 60)
+    cache_dvsa_ttl_seconds: int = _env_int("CACHE_DVSA_TTL_SECONDS", 15 * 60)
+    cache_report_ttl_seconds: int = _env_int("CACHE_REPORT_TTL_SECONDS", 5 * 60)
+    enable_llm_report_writer: bool = _env_bool("ENABLE_LLM_REPORT_WRITER", False)
+    gemini_api_key: str = os.getenv("GEMINI_API_KEY", "")
+    gemini_model: str = os.getenv("GEMINI_MODEL", "gemini-1.5-flash")
+    gemini_timeout_seconds: int = _env_int("GEMINI_TIMEOUT_SECONDS", 8)
 
     @property
     def is_production(self) -> bool:

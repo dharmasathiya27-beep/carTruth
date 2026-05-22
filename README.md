@@ -1,6 +1,6 @@
 # CarTruth
 
-CarTruth is a UK vehicle intelligence MVP built with a Next.js 14 frontend and a FastAPI backend. It searches a registration number, calls official vehicle data services from the backend, and presents a premium report with ownership scoring, MOT intelligence, mileage trends, trust messaging, and share/print utilities.
+CarTruth is a UK vehicle intelligence MVP built with a Next.js 14 frontend and a FastAPI backend. It searches a registration number, calls official vehicle data services from the backend, and presents a premium report with ownership scoring, MOT intelligence, mileage trends, trust messaging, feedback capture, and share/print/PDF utilities.
 
 ## Current Features
 
@@ -10,12 +10,15 @@ CarTruth is a UK vehicle intelligence MVP built with a Next.js 14 frontend and a
 - Safe mock/fallback mode for local development and API failures
 - Normalised MOT schema shared by mock and DVSA data
 - Rule-based ownership score, risk level, running cost estimate, reliability rating, and environmental rating
+- Optional Gemini report-writer enhancement for buyer-friendly narrative summaries, with the rule engine retained as the source of truth
 - MOT advisory classification, repeated issue detection, severity badges, and maintenance warnings
 - Mileage trend, latest mileage, maintenance window, and ownership pattern insights
 - Confidence and data source messaging
-- Share link, print report, and PDF placeholder actions
+- Supabase feedback storage in the `cartruth.feedback` table using frontend-safe anon credentials
+- Share link, print report, summary copy, and real PDF download actions
+- Backend-generated premium PDF reports through Playwright at `/api/vehicle/{registration}/pdf`
 
-CarTruth does not currently include login, payments, a database, admin tooling, or LLM-based analysis.
+CarTruth does not currently include login, payments, subscriptions, or admin tooling.
 
 ## Project Structure
 
@@ -34,10 +37,12 @@ carTruth/
 │   │       ├── dvla_service.py
 │   │       ├── dvsa_auth_service.py
 │   │       ├── dvsa_service.py
+│   │       ├── gemini_report_writer.py
 │   │       ├── lookup_cache.py
 │   │       ├── mock_vehicle_service.py
 │   │       ├── mot_analysis_service.py
 │   │       ├── mot_data_normalizer.py
+│   │       ├── pdf_service.py
 │   │       ├── vehicle_analysis_service.py
 │   │       └── vehicle_service.py
 │   ├── tests/
@@ -82,6 +87,16 @@ DVSA_API_KEY=your_dvsa_api_key
 DVSA_SCOPE_URL=https://tapi.dvsa.gov.uk/.default
 DVSA_TOKEN_URL=https://login.microsoftonline.com/<tenant-id>/oauth2/v2.0/token
 DVSA_API_BASE_URL=https://history.mot.api.gov.uk/v1/trade/vehicles/registration
+
+CACHE_ENABLED=true
+CACHE_DVLA_TTL_SECONDS=900
+CACHE_DVSA_TTL_SECONDS=900
+CACHE_REPORT_TTL_SECONDS=300
+
+ENABLE_LLM_REPORT_WRITER=false
+GEMINI_API_KEY=your_optional_gemini_key
+GEMINI_MODEL=gemini-1.5-flash
+GEMINI_TIMEOUT_SECONDS=8
 ```
 
 Secrets stay in the backend only. The frontend calls CarTruth's FastAPI backend and never calls DVLA or DVSA directly.
@@ -90,7 +105,11 @@ Set this value in `frontend/.env.local`:
 
 ```bash
 NEXT_PUBLIC_API_BASE_URL=http://localhost:8000
+NEXT_PUBLIC_SUPABASE_URL=your_supabase_project_url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
+
+The Supabase anon key is used only for no-auth feedback submissions. Do not expose a service role key in the frontend.
 
 ## Run Locally
 
@@ -101,6 +120,7 @@ cd backend
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
+python -m playwright install chromium
 uvicorn app.main:app --reload
 ```
 
@@ -164,13 +184,25 @@ The response includes:
 
 Returns backend health status.
 
+### `GET /api/vehicle/{registration}/pdf`
+
+Generates and returns a downloadable premium PDF report from a lightweight backend HTML template. The PDF includes the branded header, vehicle identity, ownership score, verdict, running cost, MOT overview, top risks, mileage summary, confidence note, and disclaimer.
+
 ### `GET /health`
 
 Top-level deployment health check. It returns backend status and whether DVLA/DVSA config exists without exposing secret values.
 
+## Feedback Storage
+
+The report feedback card inserts rows into the existing Supabase `cartruth.feedback` table. The frontend uses `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`, maps fields with the table's snake_case names, and does not require authentication.
+
 ## Caching
 
-The backend uses a small in-memory TTL cache for DVLA and DVSA registration lookups. This reduces repeated external API calls during local development and normal browsing. The cache is intentionally simple and can be replaced later with Redis or another production cache if traffic requires it.
+The backend uses a small in-memory TTL cache for DVLA lookups, DVSA lookups, and final vehicle report responses. TTLs are configurable with `CACHE_DVLA_TTL_SECONDS`, `CACHE_DVSA_TTL_SECONDS`, and `CACHE_REPORT_TTL_SECONDS`; set `CACHE_ENABLED=false` to bypass the cache locally. The cache is intentionally simple and can be replaced later with Redis or another production cache if traffic requires it.
+
+## Optional LLM Report Writer
+
+The rule engine remains the source of truth for score, verdict, risk level, MOT intelligence, running cost, and warnings. When `ENABLE_LLM_REPORT_WRITER=true` and `GEMINI_API_KEY` is configured, Gemini can rewrite the rule-based facts into a concise buyer-friendly summary. If Gemini is unavailable, CarTruth falls back to the existing rule-based summary.
 
 ## Testing Notes
 
@@ -211,6 +243,16 @@ DVSA_TOKEN_URL=https://login.microsoftonline.com/<tenant-id>/oauth2/v2.0/token
 DVSA_API_BASE_URL=https://history.mot.api.gov.uk/v1/trade/vehicles/registration
 DVSA_TOKEN_TIMEOUT_SECONDS=10
 DVSA_TIMEOUT_SECONDS=10
+
+CACHE_ENABLED=true
+CACHE_DVLA_TTL_SECONDS=900
+CACHE_DVSA_TTL_SECONDS=900
+CACHE_REPORT_TTL_SECONDS=300
+
+ENABLE_LLM_REPORT_WRITER=false
+GEMINI_API_KEY=...
+GEMINI_MODEL=gemini-1.5-flash
+GEMINI_TIMEOUT_SECONDS=8
 ```
 
 Render provides `PORT` automatically for web services. Keep the start command using `$PORT`.
@@ -230,6 +272,8 @@ Required frontend environment variable:
 
 ```bash
 NEXT_PUBLIC_API_BASE_URL=https://your-backend.onrender.com
+NEXT_PUBLIC_SUPABASE_URL=...
+NEXT_PUBLIC_SUPABASE_ANON_KEY=...
 ```
 
 After Vercel gives you a production URL, add that URL to the backend `FRONTEND_URL` and `CORS_ALLOWED_ORIGINS` values in Render.
@@ -276,6 +320,8 @@ Then open the Vercel frontend and search the same registration.
 - `FRONTEND_URL` points to the Vercel production URL.
 - `CORS_ALLOWED_ORIGINS` includes the Vercel production URL.
 - Vercel has `NEXT_PUBLIC_API_BASE_URL` set to the Render backend URL.
+- Vercel has `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY` set if feedback capture is enabled.
+- Playwright Chromium is installed in the backend deployment image for PDF generation.
 - `https://your-backend.onrender.com/health` returns `status: ok`.
 - A known valid registration lookup returns a report.
 
