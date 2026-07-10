@@ -25,6 +25,11 @@ def _normalise_vehicle_identity(payload: Any) -> dict:
         "fuel_type": payload.get("fuelType"),
         "colour": payload.get("primaryColour"),
         "registration": payload.get("registration"),
+        "first_used_date": payload.get("firstUsedDate"),
+        "has_outstanding_recall": payload.get("hasOutstandingRecall"),
+        "manufacture_date": payload.get("manufactureDate"),
+        "primary_colour": payload.get("primaryColour"),
+        "registration_date": payload.get("registrationDate"),
     }
 
 

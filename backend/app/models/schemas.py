@@ -66,9 +66,17 @@ class VehicleDetails(BaseModel):
     mot_status: Optional[str] = None
     mot_expiry_date: Optional[date] = None
     co2_emissions: Optional[int] = None
+    date_of_last_v5c_issued: Optional[date] = None
+    marked_for_export: Optional[bool] = None
+    type_approval: Optional[str] = None
     month_of_first_registration: Optional[str] = None
     wheelplan: Optional[str] = None
     euro_status: Optional[str] = None
+    first_used_date: Optional[date] = None
+    has_outstanding_recall: Optional[str] = None
+    manufacture_date: Optional[date] = None
+    primary_colour: Optional[str] = None
+    registration_date: Optional[date] = None
 
 
 class OwnershipScore(BaseModel):
@@ -110,6 +118,7 @@ class AIReport(BaseModel):
     ownershipAdvice: str = ""
     confidenceNote: str = ""
     source: str = "rule"
+    provider: str = "fallback"
 
 
 class VehicleReport(BaseModel):

@@ -8,6 +8,7 @@ from app.models.schemas import MOTRecord
 
 
 def _normalise_result(value: str) -> str:
+    """Collapse DVSA/mock result labels into the internal PASS/FAIL vocabulary."""
     result = (value or "UNKNOWN").upper()
     if result in {"PASSED", "PASS"}:
         return "PASS"
@@ -102,6 +103,8 @@ def normalise_dvsa_mot_response(response: Any) -> list[NormalizedMOTRecord]:
     Supports both the current CarTruth internal format and common DVSA MOT
     response shapes containing `motTests` and defect/comment arrays.
     """
+    # DVSA responses have appeared as either a single vehicle object or a list
+    # of vehicle objects, so the parser handles both shapes before reading tests.
     vehicles = response if isinstance(response, list) else [response]
     tests: list[dict[str, Any]] = []
     for vehicle in vehicles:
@@ -127,6 +130,9 @@ def normalise_dvsa_mot_response(response: Any) -> list[NormalizedMOTRecord]:
         if not isinstance(test, dict):
             continue
 
+        # Older and newer MOT API payloads use different names for defect rows.
+        # Keep the branches here rather than pushing shape-specific conditionals
+        # into the scoring and UI layers.
         defects = test.get("defects") or test.get("rfrAndComments") or []
         advisories: list[str] = []
         dangerous: list[str] = []

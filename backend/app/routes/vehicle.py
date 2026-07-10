@@ -8,7 +8,7 @@ from app.services.dvla_service import is_valid_registration_format, normalise_re
 from app.services.pdf_service import generate_vehicle_pdf
 from app.services.vehicle_service import (
     generate_vehicle_report,
-    generate_vehicle_report_with_gemini,
+    generate_vehicle_report_with_cache,
 )
 from fastapi import APIRouter, HTTPException, Response
 
@@ -29,7 +29,9 @@ async def search_vehicle(query: SearchQuery):
         )
 
     registration = normalise_registration(query.registration)
-    report = await generate_vehicle_report_with_gemini(registration)
+    # The normal search path uses the Supabase report cache when configured.
+    # Without cache credentials, the service falls back to live DVLA/DVSA lookups.
+    report = await generate_vehicle_report_with_cache(registration)
 
     if not report:
         raise HTTPException(

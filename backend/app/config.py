@@ -32,13 +32,18 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
+def _default_use_mock_data() -> bool:
+    app_env = os.getenv("ENVIRONMENT", os.getenv("APP_ENV", "development")).strip().lower()
+    return app_env != "production"
+
+
 @dataclass(frozen=True)
 class Settings:
     dvla_api_key: str = os.getenv("DVLA_API_KEY", "")
     app_env: str = os.getenv("ENVIRONMENT", os.getenv("APP_ENV", "development")).strip().lower()
     frontend_url: str = os.getenv("FRONTEND_URL", "").strip().rstrip("/")
     cors_allowed_origins: list[str] = field(default_factory=list)
-    use_mock_data: bool = _env_bool("USE_MOCK_DATA", True)
+    use_mock_data: bool = _env_bool("USE_MOCK_DATA", _default_use_mock_data())
     allow_mock_mot_fallback: bool = _env_bool(
         "ALLOW_MOCK_MOT_FALLBACK",
         os.getenv("APP_ENV", "development").lower() != "production",
@@ -66,6 +71,7 @@ class Settings:
     report_cache_ttl_hours: int = _env_int("REPORT_CACHE_TTL_HOURS", 24)
     report_cache_version: str = os.getenv("REPORT_CACHE_VERSION", "v1")
     enable_llm_report_writer: bool = _env_bool("ENABLE_LLM_REPORT_WRITER", False)
+    llm_provider: str = os.getenv("LLM_PROVIDER", "gemini").strip().lower()
     supabase_url: str = os.getenv("SUPABASE_URL", "").strip().rstrip("/")
     supabase_service_role_key: str = os.getenv(
         "SUPABASE_SERVICE_ROLE_KEY",
@@ -76,6 +82,9 @@ class Settings:
     gemini_fallback_model: str = os.getenv("GEMINI_FALLBACK_MODEL", "gemini-2.5-flash-lite")
     gemini_timeout_seconds: int = _env_int("GEMINI_TIMEOUT_SECONDS", 8)
     enable_gemini_cache: bool = _env_bool("ENABLE_GEMINI_CACHE", True)
+    groq_api_key: str = os.getenv("GROQ_API_KEY", "")
+    groq_model: str = os.getenv("GROQ_MODEL", "llama-3.1-8b-instant")
+    groq_timeout_seconds: int = _env_int("GROQ_TIMEOUT_SECONDS", 8)
     ai_report_version: str = os.getenv("AI_REPORT_VERSION", "v1")
 
     @property

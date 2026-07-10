@@ -10,6 +10,7 @@ backend/.DS_Store
 backend/dist/
 backend/build/
 backend/*.egg-info/
+debug_output/
 
 # Environment
 .env
@@ -25,6 +26,7 @@ frontend/node_modules/
 frontend/.next/
 frontend/out/
 frontend/dist/
+frontend/.vercel/
 frontend/npm-debug.log*
 frontend/yarn-debug.log*
 frontend/yarn-error.log*

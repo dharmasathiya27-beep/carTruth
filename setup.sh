@@ -34,6 +34,11 @@ source venv/bin/activate
 echo "📥 Installing Python dependencies..."
 pip install -r requirements.txt -q
 
+# Playwright is only used when downloading backend-generated PDF reports.
+# Installing Chromium during setup avoids a later runtime error on the PDF endpoint.
+echo "🌐 Installing Playwright Chromium for PDF generation..."
+python -m playwright install chromium
+
 echo -e "${GREEN}✓ Backend setup complete${NC}"
 echo ""
 

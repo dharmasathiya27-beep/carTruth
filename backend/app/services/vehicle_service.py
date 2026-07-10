@@ -43,6 +43,7 @@ def _build_trust_metadata(
     mileage_history_count: int,
     warnings: list[str],
 ) -> tuple[str, list[str], list[str]]:
+    """Translate backend completeness into user-facing confidence messaging."""
     unavailable: list[str] = []
     messages: list[str] = []
 
@@ -115,6 +116,11 @@ def _enrich_vehicle_data_from_dvsa(vehicle_data: dict, vehicle_identity: dict) -
         "fuel_type": "fuel_type",
         "colour": "colour",
         "registration": "registration",
+        "first_used_date": "first_used_date",
+        "has_outstanding_recall": "has_outstanding_recall",
+        "manufacture_date": "manufacture_date",
+        "primary_colour": "primary_colour",
+        "registration_date": "registration_date",
     }
     unknown_values = {"", "unknown", "unknown model", "n/a", "none"}
 
@@ -138,6 +144,7 @@ def _enrich_vehicle_data_from_dvsa(vehicle_data: dict, vehicle_identity: dict) -
 async def _fetch_source_data(
     registration_clean: str,
 ) -> Optional[tuple[dict, list[NormalizedMOTRecord], dict, str, list[str]]]:
+    """Fetch official source data, then degrade to configured mock data when needed."""
     warnings: list[str] = []
     data_source = "dvla"
 
@@ -200,6 +207,7 @@ def _build_report_from_source(
     data_source: str,
     warnings: list[str],
 ) -> VehicleReport:
+    """Turn raw DVLA/DVSA-style data into the public report contract."""
     vehicle_data = _enrich_vehicle_data_from_dvsa(vehicle_data, vehicle_identity)
     mot_history = [normalised_to_mot_record(record) for record in normalised_mot_history]
     mileage_history = _build_mileage_history_from_mot(normalised_mot_history)
@@ -289,6 +297,7 @@ async def _ensure_ai_report(
     *,
     allow_cached: bool,
 ) -> str:
+    """Attach optional LLM wording while keeping the rule engine as source of truth."""
     logger.info(
         "Gemini readiness registration=%s enabled=%s key_present=%s",
         registration,
@@ -367,9 +376,21 @@ async def generate_vehicle_report(registration: str) -> Optional[VehicleReport]:
 
 async def generate_vehicle_report_with_gemini(registration: str) -> Optional[VehicleReport]:
     """Generate a live report, then attach optional Gemini AI insights."""
-    report = await generate_vehicle_report(registration)
-    if not report:
+    registration_clean = dvla_service.normalise_registration(registration)
+    source_result = await _fetch_source_data(registration_clean)
+    if not source_result:
         return None
+
+    vehicle_data, normalised_mot_history, vehicle_identity, data_source, warnings = source_result
+    dvsa_source_data = _build_dvsa_source_payload(normalised_mot_history, vehicle_identity)
+    source_hash = generate_source_hash(vehicle_data, dvsa_source_data)
+    report = _build_report_from_source(
+        vehicle_data,
+        normalised_mot_history,
+        vehicle_identity,
+        data_source,
+        warnings,
+    )
 
     logger.info(
         "Gemini enabled=%s key_present=%s model=%s",
@@ -387,9 +408,27 @@ async def generate_vehicle_report_with_gemini(registration: str) -> Optional[Veh
         logger.info("Fallback AI used registration=%s", report.vehicle.registration)
         return report
 
+    logger.info("Checking AI cache registration=%s source_hash=%s", registration_clean, source_hash)
+    cached_ai = _ai_report_from_cache(await get_ai_report_cache(registration_clean, source_hash))
+    if cached_ai:
+        logger.info("AI cache hit registration=%s", registration_clean)
+        report.ai_report = cached_ai
+        cache_gemini_ai_report(report, cached_ai)
+        return report
+    logger.info("AI cache miss registration=%s", registration_clean)
+
     ai_report = await generate_gemini_ai_report(report)
     if ai_report:
         report.ai_report = ai_report
+        saved = await upsert_ai_cache(
+            registration_clean,
+            source_hash,
+            ai_report.model_dump(mode="json"),
+        )
+        if saved:
+            logger.info("Gemini saved to Supabase registration=%s", registration_clean)
+        else:
+            logger.warning("Gemini save failed registration=%s", registration_clean)
         logger.info("Gemini AI report attached to live report")
         return report
 
@@ -403,6 +442,7 @@ async def generate_vehicle_report_with_cache(registration: str) -> Optional[Vehi
     """Generate a report using Supabase cache with live report fallback."""
     registration_clean = dvla_service.normalise_registration(registration)
 
+    # Fast path: a fresh full report means no official API calls are needed.
     latest_cached_report = await get_latest_report_cache(registration_clean)
     if is_report_fresh(latest_cached_report):
         report = _report_from_cache(latest_cached_report)
@@ -438,6 +478,8 @@ async def generate_vehicle_report_with_cache(registration: str) -> Optional[Vehi
     source_payload = normalise_source_payload(vehicle_data, dvsa_source_data)
     source_hash = generate_source_hash(vehicle_data, dvsa_source_data)
 
+    # Source hashes let us avoid regenerating deterministic rule reports and
+    # optional LLM wording when DVLA/DVSA data has not changed.
     previous_source = await get_source_cache(registration_clean)
     source_unchanged = bool(previous_source and previous_source.get("source_hash") == source_hash)
 

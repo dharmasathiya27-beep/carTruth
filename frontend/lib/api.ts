@@ -14,6 +14,8 @@ const apiClient = axios.create({
 
 const cleanRegistration = (registration: string) => registration.toUpperCase().replace(/\s+/g, '');
 
+// These interfaces mirror backend/app/models/schemas.py. Keep field names
+// snake_case because the frontend consumes the FastAPI response directly.
 export interface VehicleDetails {
   make: string;
   model: string;
@@ -28,9 +30,17 @@ export interface VehicleDetails {
   mot_status?: string;
   mot_expiry_date?: string;
   co2_emissions?: number;
+  date_of_last_v5c_issued?: string;
+  marked_for_export?: boolean;
+  type_approval?: string;
   month_of_first_registration?: string;
   wheelplan?: string;
   euro_status?: string;
+  first_used_date?: string;
+  has_outstanding_recall?: string;
+  manufacture_date?: string;
+  primary_colour?: string;
+  registration_date?: string;
   body_style?: string;
   bodyStyle?: string;
   body_type?: string;
@@ -113,7 +123,18 @@ export interface AIReport {
   positiveSigns: string[];
   ownershipAdvice: string;
   confidenceNote: string;
-  source?: 'gemini' | 'rule';
+  source?: 'gemini' | 'groq' | 'rule';
+  provider?: 'gemini' | 'groq' | 'fallback';
+}
+
+export interface VehicleSpecificationData {
+  fuel_economy?: string;
+  performance?: string;
+  dimensions?: string;
+  weight?: string;
+  safety_rating?: string;
+  insurance_group?: string;
+  road_tax_band?: string;
 }
 
 export interface VehicleReport {
@@ -130,10 +151,13 @@ export interface VehicleReport {
   unavailable_data: string[];
   warnings: string[];
   ai_report?: AIReport | null;
+  vehicle_specifications?: VehicleSpecificationData | null;
 }
 
 export const searchVehicle = async (registration: string): Promise<VehicleReport> => {
   try {
+    // Normalise before sending so the route URL, cache keys, and DVLA lookup use
+    // the same registration shape.
     const response = await apiClient.post<VehicleReport>('/api/vehicle/search', {
       registration: cleanRegistration(registration),
     });

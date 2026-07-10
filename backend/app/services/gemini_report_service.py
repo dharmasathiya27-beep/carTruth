@@ -49,6 +49,7 @@ def build_rule_based_ai_report(report: VehicleReport) -> AIReport:
             "DVLA, DVSA, and CarTruth analysis data, not a mechanical inspection."
         ),
         source="rule",
+        provider="fallback",
     )
 
 
@@ -201,7 +202,7 @@ def _extract_json(text: str) -> Optional[dict]:
     return safe_parse_gemini_json(text)
 
 
-def _normalise_ai_report(data: dict) -> AIReport:
+def _normalise_ai_report(data: dict, provider: str) -> AIReport:
     return AIReport(
         headline=str(data.get("headline") or ""),
         summary=str(data.get("summary") or ""),
@@ -210,26 +211,22 @@ def _normalise_ai_report(data: dict) -> AIReport:
         positiveSigns=[str(item) for item in data.get("positiveSigns") or []][:5],
         ownershipAdvice=str(data.get("ownershipAdvice") or ""),
         confidenceNote=str(data.get("confidenceNote") or ""),
-        source="gemini",
+        source=provider,
+        provider=provider,
     )
 
 
-async def generate_gemini_ai_report(report: VehicleReport) -> Optional[AIReport]:
-    """Call Gemini once for a structured AI report, or return None on fallback."""
+async def generate_llm_ai_report(report: VehicleReport) -> Optional[AIReport]:
+    """Try Gemini, then Groq, returning None so callers can use rule fallback."""
     logger.info(
-        "Gemini enabled=%s key_present=%s model=%s fallback_model=%s version=%s timeout=%s",
+        "LLM enabled=%s provider=%s gemini_key_present=%s groq_key_present=%s",
         settings.enable_llm_report_writer,
+        settings.llm_provider,
         bool(settings.gemini_api_key),
-        settings.gemini_model,
-        settings.gemini_fallback_model,
-        settings.ai_report_version,
-        settings.gemini_timeout_seconds,
+        bool(settings.groq_api_key),
     )
     if not settings.enable_llm_report_writer:
-        logger.info("Gemini skipped because disabled")
-        return None
-    if not settings.gemini_api_key:
-        logger.info("Gemini skipped because key is missing")
+        logger.info("LLM skipped because disabled")
         return None
 
     cached = get_cached_gemini_ai_report(report)
@@ -245,15 +242,57 @@ async def generate_gemini_ai_report(report: VehicleReport) -> Optional[AIReport]
         },
     }
 
-    data = await _call_gemini_with_retries(
-        model=settings.gemini_model,
-        payload=payload,
-        registration=report.vehicle.registration,
-        is_fallback_model=False,
-    )
-    if data is None:
+    parsed = None
+    provider = ""
+
+    if settings.gemini_api_key:
+        gemini_data = await _call_gemini_with_retries(
+            model=settings.gemini_model,
+            payload=payload,
+            registration=report.vehicle.registration,
+            is_fallback_model=False,
+        )
+        parsed = _parse_gemini_response(gemini_data, report.vehicle.registration)
+        if parsed:
+            provider = "gemini"
+        else:
+            logger.info(
+                "Gemini unavailable; trying Groq registration=%s", report.vehicle.registration
+            )
+    else:
+        logger.info("Gemini skipped because key is missing; trying Groq")
+
+    if not parsed:
+        groq_text = await _call_groq(
+            prompt=_prompt(report),
+            registration=report.vehicle.registration,
+        )
+        parsed = _parse_provider_text(
+            groq_text,
+            provider="groq",
+            registration=report.vehicle.registration,
+        )
+        if parsed:
+            provider = "groq"
+
+    if not parsed:
+        logger.info("All LLM providers failed; rule-based fallback will be used")
         return None
 
+    ai_report = _normalise_ai_report(parsed, provider)
+    cache_gemini_ai_report(report, ai_report)
+    logger.info("LLM success registration=%s provider=%s", report.vehicle.registration, provider)
+    return ai_report
+
+
+async def generate_gemini_ai_report(report: VehicleReport) -> Optional[AIReport]:
+    """Backward-compatible alias for the multi-provider LLM report writer."""
+    return await generate_llm_ai_report(report)
+
+
+def _parse_gemini_response(data: Optional[dict[str, Any]], registration: str) -> Optional[dict]:
+    if data is None:
+        return None
     try:
         text = data["candidates"][0]["content"]["parts"][0]["text"]
     except (KeyError, IndexError, TypeError):
@@ -261,15 +300,23 @@ async def generate_gemini_ai_report(report: VehicleReport) -> Optional[AIReport]
         return None
 
     logger.info("Gemini raw response received")
+    return _parse_provider_text(text, provider="gemini", registration=registration)
+
+
+def _parse_provider_text(
+    text: Optional[str], *, provider: str, registration: str
+) -> Optional[dict]:
+    if not text:
+        return None
     parsed = _extract_json(text)
     if not parsed:
-        logger.warning("Gemini failed because JSON parsing failed gemini_status=FAILED")
+        logger.warning(
+            "%s failed because JSON parsing failed registration=%s",
+            provider.capitalize(),
+            registration,
+        )
         return None
-
-    ai_report = _normalise_ai_report(parsed)
-    cache_gemini_ai_report(report, ai_report)
-    logger.info("Gemini success registration=%s", report.vehicle.registration)
-    return ai_report
+    return parsed
 
 
 async def _call_gemini_with_retries(
@@ -352,3 +399,65 @@ async def _post_gemini(
             type(exc).__name__,
         )
         return None, 0
+
+
+async def _call_groq(*, prompt: str, registration: str) -> Optional[str]:
+    if not settings.groq_api_key:
+        logger.info("Groq skipped because key is missing")
+        return None
+
+    logger.info(
+        "Groq called registration=%s model=%s",
+        registration,
+        settings.groq_model,
+    )
+    payload = {
+        "model": settings.groq_model,
+        "messages": [
+            {
+                "role": "system",
+                "content": (
+                    "Return only valid raw JSON. Do not use markdown, code fences, "
+                    "or explanatory text."
+                ),
+            },
+            {"role": "user", "content": prompt},
+        ],
+        "temperature": 0.2,
+        "max_tokens": 700,
+        "response_format": {"type": "json_object"},
+    }
+
+    try:
+        async with aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=settings.groq_timeout_seconds)
+        ) as session:
+            async with session.post(
+                "https://api.groq.com/openai/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {settings.groq_api_key}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+            ) as response:
+                if response.status >= 400:
+                    body = await response.text()
+                    logger.warning(
+                        "Groq failed with status=%s body=%s",
+                        response.status,
+                        body[:1200],
+                    )
+                    return None
+                data = await response.json()
+    except (aiohttp.ClientError, TimeoutError, asyncio.TimeoutError, ValueError) as exc:
+        logger.warning("Groq failed error_type=%s", type(exc).__name__)
+        return None
+
+    try:
+        content = data["choices"][0]["message"]["content"]
+    except (KeyError, IndexError, TypeError):
+        logger.warning("Groq failed because response text was missing")
+        return None
+
+    logger.info("Groq raw response received")
+    return str(content)
